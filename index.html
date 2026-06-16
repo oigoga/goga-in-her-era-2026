@@ -1369,6 +1369,33 @@ body {
 }
 .mc-open-save-btn:hover { background: var(--sage-dark); }
 
+.mc-open-cat-section { margin-bottom: 28px; }
+.mc-open-cat-header {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 16px; border-radius: 10px 10px 0 0;
+  background: var(--linen); margin-bottom: 1px;
+}
+.mc-open-cat-name-label {
+  font-size: 12px; font-weight: 700; color: var(--warm-dark); text-transform: uppercase; letter-spacing: 1px;
+}
+.mc-open-goal-card {
+  background: var(--white); border: 1px solid var(--blush);
+  border-radius: 0; padding: 14px 18px; border-top: none;
+  display: flex; flex-direction: column; gap: 8px;
+}
+.mc-open-goal-card:last-child { border-radius: 0 0 12px 12px; }
+.mc-open-goal-top {
+  display: flex; align-items: center; gap: 8px;
+}
+.mc-open-goal-name { font-size: 13px; font-weight: 600; color: var(--warm-dark); flex: 1; }
+.mc-open-qtarget {
+  font-size: 11px; color: var(--warm-muted); font-style: italic;
+  padding: 5px 10px; background: var(--linen); border-radius: 6px;
+}
+.mc-open-wk-hint {
+  font-size: 10px; color: var(--warm-muted); font-style: italic; margin-top: -2px;
+}
+
 /* Panel divider */
 .mc-panel-divider {
   display: flex; align-items: center; gap: 14px; margin: 36px 0 28px;
@@ -3078,6 +3105,7 @@ if (!S.monthCloseData) S.monthCloseData = {};
 if (!S.monthClosedCards) S.monthClosedCards = {};
 if (!S.monthOpenData) S.monthOpenData = {};
 if (!S.monthResetDone) S.monthResetDone = {};
+if (!S.monthPlan) S.monthPlan = {};
 
 // habit view modes
 const habitViewMode = { daily:'weekly', weekly:'weekly' };
@@ -3148,6 +3176,36 @@ function getWeekLabel(weekKey) {
 // Week key for habits and Sunday refresh — now evergreen (delegates to getCurrentWeekKey).
 // Old Qa habit data stays under 'qa-wk*' keys and remains accessible for history.
 function freqWeekKey(d) { return getCurrentWeekKey(d || new Date()); }
+
+function getPrevMonthKey() {
+  const d = new Date();
+  d.setDate(1);
+  d.setMonth(d.getMonth() - 1);
+  return getMonthKey(d);
+}
+
+function getMonthWeekKeys(monthKey) {
+  return getWeeksForMonth(monthKey).map(w => w.key);
+}
+
+function getQuarterForMonth(monthKey) {
+  const m = parseInt(monthKey.split('-')[1], 10) - 1; // 0-indexed
+  if (m >= 2 && m <= 4) return 'Qa';
+  if (m >= 5 && m <= 7) return 'Qb';
+  if (m >= 8 && m <= 10) return 'Qc';
+  return 'Rest';
+}
+
+function getQTargetText(g, quarter) {
+  if (quarter === 'Qa') return g.qa || '';
+  if (quarter === 'Qb') return g.qb || '';
+  if (quarter === 'Qc') return g.qc || '';
+  return '';
+}
+
+function mcCatIcon(catKey) {
+  return (MC_CATS.find(c => c.key === catKey) || {}).icon || '📌';
+}
 
 // Short day label like "Mon 9"
 function shortDayLabel(d) {
@@ -5170,16 +5228,13 @@ function renderMonthlyClose() {
   const panel = document.getElementById('monthly-close-panel');
   if (!panel) return;
 
-  // Only render close panel for Qa months
+  // For non-Qa previous months: close UI will be implemented in Step 7.
+  // For now just show the open (plan) panel.
   if (!prevWeeks.length) {
     panel.innerHTML = '';
     renderMonthlyOpen();
     return;
   }
-
-  // Update monthly view subtitle
-  const viewSub = document.getElementById('monthly-view-sub');
-  if (viewSub) viewSub.textContent = `${new Date().toLocaleDateString('en-GB',{month:'long',year:'numeric'})}`;
 
   panel.innerHTML = `
     <div class="mc-close-section-label">${monthInfo.name} <em>Close</em></div>
@@ -5292,86 +5347,119 @@ function mcCurrMonthInfo() {
 function renderMonthlyOpen() {
   const panel = document.getElementById('monthly-open-panel');
   if (!panel) return;
-  const monthInfo = mcCurrMonthInfo();
-  const weeks = MC_MONTH_WEEKS[monthInfo.name] || [];
 
-  // Only render if this is a Qa month (Mar/Apr/May)
-  if (!weeks.length) {
-    panel.innerHTML = '';
-    const divider = document.getElementById('mc-panel-divider');
-    if (divider) divider.style.display = 'none';
-    return;
-  }
+  const monthKey  = getMonthKey(new Date());
+  const weekKeys  = getMonthWeekKeys(monthKey);
+  const quarter   = getQuarterForMonth(monthKey);
+  const [yr, mo]  = monthKey.split('-');
+  const monthName = new Date(+yr, +mo - 1, 1)
+    .toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
 
-  const wkHint = weeks.join(', ');
+  const viewSub = document.getElementById('monthly-view-sub');
+  if (viewSub) viewSub.textContent = monthName;
+
+  if (!S.monthPlan[monthKey]) S.monthPlan[monthKey] = {};
+
+  const wkHint = weekKeys.length
+    ? weekKeys.map(k => getWeekLabel(k)).join(' · ')
+    : 'No weeks computed yet';
+
+  // Build per-category sections — only cats that have active goals
+  const cats = Object.keys(CAT_COLORS).filter(k => k !== 'DEFAULT');
+  const sections = cats.map(catKey => {
+    const goals = GOALS.filter(g =>
+      g.cat === catKey && g.status !== 'paused' && g.status !== 'dropped'
+    );
+    if (!goals.length) return '';
+    const c = CAT_COLORS[catKey] || CAT_COLORS.DEFAULT;
+    const icon = mcCatIcon(catKey);
+    const catLabel = catKey.charAt(0) + catKey.slice(1).toLowerCase();
+
+    const goalCards = goals.map(g => {
+      const goalNum  = GOALS.indexOf(g) + 1;
+      const qTarget  = getQTargetText(g, quarter);
+      const saved    = (S.monthPlan[monthKey] || {})[g.id] || {};
+      const planVal  = saved.target || '';
+      const cardId   = `mplan-${monthKey}-${g.id}`;
+
+      return `<div class="mc-open-goal-card">
+        <div class="mc-open-goal-top">
+          <span class="goal-num-badge" style="font-size:10px;margin-bottom:0">G${goalNum}</span>
+          <span class="mc-open-goal-name">${g.name}</span>
+        </div>
+        ${qTarget ? `<div class="mc-open-qtarget">${quarter}: ${qTarget}</div>` : ''}
+        <textarea class="mc-open-textarea" id="${cardId}"
+          placeholder="This month's focus for this goal…"
+          onblur="mcSavePlan('${monthKey}','${g.id}')">${planVal}</textarea>
+        <button class="mc-open-save-btn" onclick="mcSavePlan('${monthKey}','${g.id}')">Save ✓</button>
+      </div>`;
+    }).join('');
+
+    return `<div class="mc-open-cat-section">
+      <div class="mc-open-cat-header" style="border-left:4px solid ${c.border}">
+        <span>${icon}</span>
+        <span class="mc-open-cat-name-label">${catLabel}</span>
+      </div>
+      ${goalCards}
+    </div>`;
+  }).filter(Boolean);
 
   panel.innerHTML = `
     <div class="mc-open-header">
       <div>
-        <div class="mc-open-title">${monthInfo.name} <em>Planning</em></div>
-        <div class="mc-open-sub">Set your intentions for each area · feeds into weekly milestones</div>
+        <div class="mc-open-title">${monthName.split(' ')[0]} <em>Planning</em></div>
+        <div class="mc-open-sub">${quarter} · ${wkHint}</div>
       </div>
     </div>
-    <div class="mc-open-grid">
-      ${MC_CATS.map(cat => mcOpenCardHTML(cat, monthInfo, wkHint)).join('')}
-    </div>`;
+    ${sections.length
+      ? sections.join('')
+      : '<div style="padding:20px;color:var(--warm-muted);font-size:13px">No active goals. Add goals on the Goals page first.</div>'}`;
 
-  // Show divider between open and close panels
-  const divider = document.getElementById('mc-panel-divider');
+  // Divider between open/close panels
+  const prevMonthKey = getPrevMonthKey();
+  const [pyr, pmo]   = prevMonthKey.split('-');
+  const prevName     = new Date(+pyr, +pmo - 1, 1)
+    .toLocaleDateString('en-GB', { month: 'long' });
+  const divider  = document.getElementById('mc-panel-divider');
   const divLabel = document.getElementById('mc-panel-divider-label');
-  const prevInfo = mcPrevMonthInfo();
-  if (divider) divider.style.display = weeks.length && MC_MONTH_WEEKS[prevInfo.name] ? 'flex' : 'none';
-  if (divLabel) divLabel.textContent = `${prevInfo.name} Close`;
+  if (divider) divider.style.display = 'flex';
+  if (divLabel) divLabel.textContent = `${prevName} Close`;
 }
 
-function mcOpenCardHTML(cat, monthInfo, wkHint) {
-  const cardKey = `${monthInfo.name}-${cat.key}`;
-  const saved   = S.monthOpenData[cardKey] || {};
-  const val     = saved.milestones || '';
-
-  return `<div class="mc-open-card" id="mcopen-card-${cardKey}">
-    <div class="mc-open-card-header">
-      <span class="mc-open-cat-icon">${cat.icon}</span>
-      <span class="mc-open-cat-name">${cat.label}</span>
-    </div>
-    <textarea class="mc-open-textarea" id="mcopen-ta-${cardKey}"
-      placeholder="Write your intentions, milestones, or goals for ${cat.label} this month…"
-      onblur="mcSaveOpenCard('${cardKey}')">${val}</textarea>
-    <div class="mc-open-week-hint">Feeds into: ${wkHint}</div>
-    <button class="mc-open-save-btn" onclick="mcSaveOpenCard('${cardKey}')">Save</button>
-  </div>`;
+function mcSavePlan(monthKey, goalId) {
+  const cardId  = `mplan-${monthKey}-${goalId}`;
+  const taEl    = document.getElementById(cardId);
+  if (!taEl) return;
+  if (!S.monthPlan[monthKey]) S.monthPlan[monthKey] = {};
+  S.monthPlan[monthKey][goalId] = { target: taEl.value, savedAt: Date.now() };
+  saveState();
+  toast('Plan saved ✓');
 }
 
+// Kept for Qa backwards-compat — not called for Qb+ months.
 function mcSaveOpenCard(cardKey) {
   const ta = document.getElementById('mcopen-ta-' + cardKey);
   if (!ta) return;
-
-  const parts = cardKey.split('-'); // e.g. ['Apr','FAITH']
+  const parts     = cardKey.split('-');
   const monthName = parts[0];
   const catKey    = parts.slice(1).join('-');
-
   if (!S.monthOpenData[cardKey]) S.monthOpenData[cardKey] = {};
   S.monthOpenData[cardKey].milestones = ta.value;
   S.monthOpenData[cardKey].savedAt    = Date.now();
-
-  // Write milestones text into the weekly goal slots for this month
   const weeks = MC_MONTH_WEEKS[monthName] || [];
-  const milestoneLine = ta.value.trim();
-  if (milestoneLine) {
+  if (ta.value.trim()) {
     GOALS.filter(g => g.cat === catKey).forEach(goal => {
       weeks.forEach(wkLabel => {
         if (goal.weekly.hasOwnProperty(wkLabel)) {
-          // Only overwrite if the slot is empty or still the default '—'
           const current = goal.weekly[wkLabel];
           if (!current || current === '—') {
-            goal.weekly[wkLabel] = milestoneLine;
-            S.milestoneEdits[`${goal.id}-${wkLabel}`] = milestoneLine;
+            goal.weekly[wkLabel] = ta.value.trim();
+            S.milestoneEdits[`${goal.id}-${wkLabel}`] = ta.value.trim();
           }
         }
       });
     });
   }
-
   saveState();
   toast(`${monthName} · ${catKey} plan saved ✓`);
 }
@@ -5381,10 +5469,15 @@ function mcSaveOpenCard(cardKey) {
 // ═══════════════════════════════════════════════════
 
 function mcDoMonthReset(closedMonth) {
-  const closedWeeks = MC_MONTH_WEEKS[closedMonth] || [];
-  const newMonthInfo = mcCurrMonthInfo();
-  const newMonthWeeks = MC_MONTH_WEEKS[newMonthInfo.name] || [];
-  const firstNewWeek = newMonthWeeks[0] || null;
+  // closedMonth may be a Qa short name ('May') or an evergreen monthKey ('2026-05')
+  const isEvergreenKey = closedMonth.includes('-');
+  const closedWeeks = isEvergreenKey
+    ? getMonthWeekKeys(closedMonth)
+    : (MC_MONTH_WEEKS[closedMonth] || []);
+
+  const newMonthKey  = getMonthKey(new Date());
+  const newWeekKeys  = getMonthWeekKeys(newMonthKey);
+  const firstNewWeek = newWeekKeys[0] || null;
 
   // 1) Drop completed tasks from the closed month
   const completedIds = (S.weeklyTasks || [])
@@ -5416,7 +5509,7 @@ function mcDoMonthReset(closedMonth) {
     if (openPanel) openPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }, 300);
 
-  toast(`${closedMonth} closed · tasks carried forward to ${firstNewWeek || newMonthInfo.name} ✓`);
+  toast(`${closedMonth} closed · tasks carried forward to ${firstNewWeek || newMonthKey} ✓`);
 }
 
 // ═══════════════════════════════════════════════════
