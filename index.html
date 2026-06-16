@@ -2457,7 +2457,7 @@ input[type=range] {
 <aside class="sidebar">
   <div class="sidebar-header">
     <div class="sidebar-title">Goga's Planner</div>
-    <div class="sidebar-sub">2026 · Qa · Mar–May</div>
+    <div class="sidebar-sub" id="sidebar-quarter-label"></div>
     <div class="sidebar-date" id="sidebar-date"></div>
   </div>
   <nav class="nav">
@@ -2627,7 +2627,7 @@ input[type=range] {
 <div id="view-goals" class="view">
   <div class="page-header" style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap">
     <div>
-      <div class="page-title"><em id="goals-page-count">18 Goals</em> · 2026</div>
+      <div class="page-title"><em id="goals-page-count">18 Goals</em> · <span id="goals-year-label">2026</span></div>
       <div class="page-sub">Edit existing goals and add Qb goals. Click any goal to update progress.</div>
     </div>
     <div style="display:flex;gap:8px;flex-shrink:0;margin-top:4px">
@@ -2690,7 +2690,7 @@ input[type=range] {
 <div id="view-quarter" class="view">
   <div class="page-header">
     <div class="page-title">Qa <em>Overview</em></div>
-    <div class="page-sub">March – May 2026 · All 18 goals across the quarter.</div>
+    <div class="page-sub" id="quarter-overview-sub">March – May 2026 · All 18 goals across the quarter.</div>
   </div>
   <div class="q-table-wrap">
     <table class="q-table" id="q-table"></table>
@@ -3223,13 +3223,17 @@ const habitViewMode = { daily:'weekly', weekly:'weekly' };
 // ═══════════════════════════════════════════════════
 // UTILS
 // ═══════════════════════════════════════════════════
+// ── Dev date override — Ctrl+Shift+D opens the simulator panel ──
+let _debugDate = null;
+function getToday() { return _debugDate ? new Date(_debugDate) : new Date(); }
+
 function dayKey(d) { return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`; }
-function todayKey() { return dayKey(new Date()); }
+function todayKey() { return dayKey(getToday()); }
 
 // ── Evergreen time: all periods computed from the date, never from frozen arrays ──
 
 function getMonthKey(date) {
-  const d = date || new Date();
+  const d = date || getToday();
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
 }
 
@@ -3256,7 +3260,7 @@ function getWeeksForMonth(monthKey) {
 // Returns the week key (e.g. '2026-06-w2') that the given date falls into.
 // Weeks start Sunday at 2pm; the week belongs to the month of its Sunday start.
 function getCurrentWeekKey(date) {
-  const d = date || new Date();
+  const d = date || getToday();
   const dayOfWeek = d.getDay(); // 0 = Sunday
   const wkStart = new Date(d);
   wkStart.setDate(d.getDate() - dayOfWeek);
@@ -3285,10 +3289,10 @@ function getWeekLabel(weekKey) {
 
 // Week key for habits and Sunday refresh — now evergreen (delegates to getCurrentWeekKey).
 // Old Qa habit data stays under 'qa-wk*' keys and remains accessible for history.
-function freqWeekKey(d) { return getCurrentWeekKey(d || new Date()); }
+function freqWeekKey(d) { return getCurrentWeekKey(d || getToday()); }
 
 function getPrevMonthKey() {
-  const d = new Date();
+  const d = getToday();
   d.setDate(1);
   d.setMonth(d.getMonth() - 1);
   return getMonthKey(d);
@@ -3346,9 +3350,9 @@ function generateId() {
 
 // Create and persist a new task. Pass weekKey:null for month pool (unscheduled).
 function addWeeklyTask(task) {
-  const weekKey  = 'weekKey' in task ? task.weekKey : getCurrentWeekKey(new Date());
+  const weekKey  = 'weekKey' in task ? task.weekKey : getCurrentWeekKey(getToday());
   const monthKey = task.monthKey ||
-    (weekKey ? weekKey.split('-w')[0] : getMonthKey(new Date()));
+    (weekKey ? weekKey.split('-w')[0] : getMonthKey(getToday()));
   const t = {
     id:           generateId(),
     text:         task.text          || '',
@@ -3562,6 +3566,7 @@ function showView(id, el) {
   if (id==='quarter') renderQuarter();
   if (id==='finance') renderFinance();
   if (id==='monthly') renderMonthlyClose();
+  updateDynamicLabels();
 }
 
 function updateMobileNav(id) {
@@ -3574,7 +3579,7 @@ function updateMobileNav(id) {
 // HOME
 // ═══════════════════════════════════════════════════
 function renderHome() {
-  const now = new Date();
+  const now = getToday();
   const h = now.getHours();
   const greet = h<12?'Good morning':h<17?'Good afternoon':'Good evening';
   document.getElementById('hero-name').innerHTML = `${greet}, <em>Goga 👑</em>`;
@@ -3586,7 +3591,7 @@ function renderHome() {
   document.getElementById('hero-ref').textContent = aff.ref;
   document.getElementById('sidebar-verse').textContent = `"${aff.text}" — ${aff.ref}`;
 
-  const wkLabel = getCurrentWeekKey(new Date());
+  const wkLabel = getCurrentWeekKey(now);
   const wkNum = parseInt(wkLabel.split('-w')[1]) || 1;
   document.getElementById('s-week').textContent = wkNum;
   const allWeeklyTasks = getTasksForWeek(wkLabel);
@@ -3735,6 +3740,7 @@ function renderHome() {
 
   plateEl.innerHTML = plateHTML;
   renderSundayRefresh('home-sunday-refresh');
+  updateDynamicLabels();
 }
 
 function toggleDailyToday(hid) {
@@ -3767,9 +3773,9 @@ function homeAddTodayTask() {
   const inp = document.getElementById('home-today-input');
   const text = inp ? inp.value.trim() : '';
   if (!text) { if (inp) inp.focus(); return; }
-  const now2 = new Date();
+  const now2 = getToday();
   const todayDay = WP_DAYS[now2.getDay() === 0 ? 6 : now2.getDay() - 1];
-  const wkLabel  = getCurrentWeekKey(new Date());
+  const wkLabel  = getCurrentWeekKey(now2);
   addWeeklyTask({ text, weekKey: wkLabel, assignedDay: todayDay });
   inp.value = '';
   renderHome();
@@ -3838,8 +3844,9 @@ function wpSetMobileDay(day) {
 
 function renderWeek() {
   carryForwardIncompleteTasks(); // no-op if tasks already in current week
-  const wkLabel    = getCurrentWeekKey(new Date());
-  const curMonthKey = getMonthKey(new Date());
+  const _today     = getToday();
+  const wkLabel    = getCurrentWeekKey(_today);
+  const curMonthKey = getMonthKey(_today);
 
   document.getElementById('wk-badge').textContent = 'This Week';
   document.getElementById('wk-title').textContent = getWeekLabel(wkLabel);
@@ -3856,7 +3863,7 @@ function renderWeek() {
   const poolTasks = allWkTasks.filter(t => !t.assignedDay);
 
   // Today's day name
-  const todayDay = WP_DAYS[new Date().getDay() === 0 ? 6 : new Date().getDay() - 1];
+  const todayDay = WP_DAYS[_today.getDay() === 0 ? 6 : _today.getDay() - 1];
 
   // Category & goal dropdowns for add row
   const catOptions = Object.keys(CAT_COLORS)
@@ -4048,7 +4055,7 @@ function wpDrop(e, day) {
   const updates = { assignedDay: day || null };
   // Promote from month pool to current week when dropped into week pool or day column
   if (task && !task.weekKey) {
-    updates.weekKey = getCurrentWeekKey(new Date());
+    updates.weekKey = getCurrentWeekKey(getToday());
   }
   updateWeeklyTask(id, updates);
   renderWeek();
@@ -4066,7 +4073,7 @@ function wpDropToMonth(e) {
 }
 
 function wpPromoteToWeek(id) {
-  updateWeeklyTask(id, { weekKey: getCurrentWeekKey(new Date()), assignedDay: null });
+  updateWeeklyTask(id, { weekKey: getCurrentWeekKey(getToday()), assignedDay: null });
   renderWeek();
   renderHome();
   toast('Added to this week ✓');
@@ -4078,7 +4085,7 @@ function wpAddTask() {
   const goalSel = document.getElementById('wp-goal-select');
   const text = inp ? inp.value.trim() : '';
   if (!text) { if (inp) inp.focus(); return; }
-  const wkLabel = getCurrentWeekKey(new Date());
+  const wkLabel = getCurrentWeekKey(getToday());
   addWeeklyTask({
     text,
     category:     catSel.value  || null,
@@ -5653,7 +5660,7 @@ function renderMonthlyOpen() {
   const panel = document.getElementById('monthly-open-panel');
   if (!panel) return;
 
-  const monthKey  = getMonthKey(new Date());
+  const monthKey  = getMonthKey(getToday());
   const weekKeys  = getMonthWeekKeys(monthKey);
   const quarter   = getQuarterForMonth(monthKey);
   const [yr, mo]  = monthKey.split('-');
@@ -5804,7 +5811,7 @@ function mcDoMonthReset(closedMonth) {
     ? getMonthWeekKeys(closedMonth)
     : (MC_MONTH_WEEKS[closedMonth] || []);
 
-  const newMonthKey  = getMonthKey(new Date());
+  const newMonthKey  = getMonthKey(getToday());
   const newWeekKeys  = getMonthWeekKeys(newMonthKey);
   const firstNewWeek = newWeekKeys[0] || null;
 
@@ -6673,6 +6680,66 @@ function saveFinSettings() {
   toast('Settings saved ✓');
 }
 
+// ═══════════════════════════════════════════════════
+// DYNAMIC LABELS — sidebar quarter + goals year + quarter overview subtitle
+// ═══════════════════════════════════════════════════
+const QUARTER_RANGE_LABELS = { Qa:'Mar–May', Qb:'Jun–Aug', Qc:'Sep–Nov', Rest:'Dec' };
+const QUARTER_MONTHS = { Qa:[2,3,4], Qb:[5,6,7], Qc:[8,9,10], Rest:[11] };
+const MONTH_NAMES_LONG = ['January','February','March','April','May','June',
+  'July','August','September','October','November','December'];
+
+function updateDynamicLabels() {
+  const now = getToday();
+  const monthKey = getMonthKey(now);
+  const quarter = getQuarterForMonth(monthKey);
+  const year = now.getFullYear();
+
+  const el1 = document.getElementById('sidebar-quarter-label');
+  if (el1) el1.textContent = `${year} · ${quarter} · ${QUARTER_RANGE_LABELS[quarter] || ''}`;
+
+  const el2 = document.getElementById('goals-year-label');
+  if (el2) el2.textContent = year;
+
+  const months = QUARTER_MONTHS[quarter] || [];
+  let rangeStr;
+  if (months.length >= 2) {
+    rangeStr = `${MONTH_NAMES_LONG[months[0]]} – ${MONTH_NAMES_LONG[months[months.length-1]]} ${year}`;
+  } else {
+    rangeStr = `${MONTH_NAMES_LONG[months[0] !== undefined ? months[0] : 11]} ${year}`;
+  }
+  const el3 = document.getElementById('quarter-overview-sub');
+  if (el3) el3.textContent = `${rangeStr} · All ${GOALS.length} goals across the quarter.`;
+}
+
+// ═══════════════════════════════════════════════════
+// DEV DATE SIMULATOR
+// ═══════════════════════════════════════════════════
+function devSetDate() {
+  const val = document.getElementById('dev-date-input').value;
+  if (!val) { toast('Pick a date first'); return; }
+  _debugDate = val + 'T12:00:00';
+  applyTheme(getToday());
+  renderHome();
+  const status = document.getElementById('dev-date-status');
+  if (status) status.textContent = 'Simulating ' +
+    getToday().toLocaleDateString('en-GB', { weekday:'short', day:'numeric', month:'short', year:'numeric' });
+  toast('Simulating ' + val);
+}
+function devClearDate() {
+  _debugDate = null;
+  applyTheme(getToday());
+  renderHome();
+  const status = document.getElementById('dev-date-status');
+  if (status) status.textContent = 'Using real today';
+  toast('Date reset to today');
+}
+document.addEventListener('keydown', e => {
+  if (e.ctrlKey && e.shiftKey && e.key === 'D') {
+    const panel = document.getElementById('dev-date-panel');
+    if (panel) panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+  }
+});
+
 // INIT — load local first, then sync from cloud
 // ═══════════════════════════════════════════════════
 renderHome();
@@ -6680,5 +6747,24 @@ syncDown().then(() => {
   renderHome();
 });
 </script>
+
+<!-- ═══ DEV DATE SIMULATOR (Ctrl+Shift+D to toggle) ═══ -->
+<div id="dev-date-panel" style="display:none;position:fixed;bottom:20px;right:20px;z-index:9999;
+  background:#1B3559;color:#F4E4B8;border-radius:14px;padding:16px 20px;
+  font-family:'Poppins',sans-serif;font-size:12px;box-shadow:0 4px 24px rgba(0,0,0,0.35);
+  min-width:240px">
+  <div style="font-weight:700;letter-spacing:1px;text-transform:uppercase;font-size:10px;
+    margin-bottom:10px;color:#E8B775">🗓 Date Simulator</div>
+  <input type="date" id="dev-date-input" style="width:100%;padding:6px 10px;border-radius:8px;
+    border:1.5px solid #E8B775;background:#2F4A6B;color:#F8EFD8;font-family:'Poppins',sans-serif;
+    font-size:12px;margin-bottom:8px;box-sizing:border-box">
+  <div style="display:flex;gap:8px">
+    <button onclick="devSetDate()" style="flex:1;padding:6px;border-radius:8px;border:none;
+      background:#E8B775;color:#1B3559;font-weight:700;font-size:11px;cursor:pointer">Simulate →</button>
+    <button onclick="devClearDate()" style="flex:1;padding:6px;border-radius:8px;border:none;
+      background:#3A5680;color:#F4E4B8;font-weight:700;font-size:11px;cursor:pointer">Reset</button>
+  </div>
+  <div id="dev-date-status" style="margin-top:8px;font-size:10px;color:#D7DEE8;text-align:center"></div>
+</div>
 </body>
 </html>
