@@ -688,6 +688,20 @@ body {
   font-family: 'Poppins', sans-serif; cursor: text;
 }
 .pool-card-time:focus { border-bottom-color: var(--rose); color: var(--warm-dark); }
+.month-plan-badge {
+  font-size: 9px; font-weight: 800; letter-spacing: 0.8px;
+  background: var(--accent-light); color: var(--warm-dark);
+  border: 1px solid var(--accent); border-radius: 10px;
+  padding: 2px 6px; text-transform: uppercase; flex-shrink: 0;
+}
+.wp-promote-btn {
+  font-size: 9px; font-weight: 700;
+  border: 1px solid var(--sage); border-radius: 6px;
+  background: transparent; color: var(--sage-dark);
+  padding: 2px 6px; cursor: pointer; flex-shrink: 0;
+  font-family: 'Poppins', sans-serif;
+}
+.wp-promote-btn:hover { background: var(--sage); color: #fff; }
 .wp-day-sel {
   font-size: 9px; font-weight: 700;
   border: 1px solid var(--blush-deep); border-radius: 6px;
@@ -3069,6 +3083,22 @@ let S = loadState();
   try { localStorage.setItem('goga2026v2', JSON.stringify(S)); } catch {}
 })();
 
+(function runMigrationV5() {
+  if (S.schemaVersion >= 5) return;
+  // Backfill monthKey and planned flag on all existing tasks
+  if (S.weeklyTasks) {
+    S.weeklyTasks = S.weeklyTasks.map(t => ({
+      planned: false,
+      monthKey: t.weekKey
+        ? t.weekKey.split('-w')[0]
+        : (t.monthKey || null),
+      ...t,
+    }));
+  }
+  S.schemaVersion = 5;
+  try { localStorage.setItem('goga2026v2', JSON.stringify(S)); } catch {}
+})();
+
 // Live aliases — all existing code continues to read from these names.
 // `let` so syncDown can refresh them after merging a remote state blob.
 let GOALS              = S.goals;
@@ -3234,16 +3264,21 @@ function generateId() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 }
 
-// Create and persist a new task. All fields optional except text + weekKey.
+// Create and persist a new task. Pass weekKey:null for month pool (unscheduled).
 function addWeeklyTask(task) {
+  const weekKey  = 'weekKey' in task ? task.weekKey : getCurrentWeekKey(new Date());
+  const monthKey = task.monthKey ||
+    (weekKey ? weekKey.split('-w')[0] : getMonthKey(new Date()));
   const t = {
     id:           generateId(),
     text:         task.text          || '',
     category:     task.category      || null,
     goalId:       task.goalId        || null,
-    weekKey:      task.weekKey       || null,
+    monthKey,
+    weekKey,
     assignedDay:  task.assignedDay   || null,
     proposedTime: task.proposedTime  || null,
+    planned:      task.planned       ?? false,
     completed:    task.completed     ?? false,
     isBacklog:    task.isBacklog     ?? false,
     createdAt:    task.createdAt     || Date.now(),
@@ -3723,7 +3758,8 @@ function wpSetMobileDay(day) {
 
 function renderWeek() {
   carryForwardIncompleteTasks(); // no-op if tasks already in current week
-  const wkLabel = getCurrentWeekKey(new Date());
+  const wkLabel    = getCurrentWeekKey(new Date());
+  const curMonthKey = getMonthKey(new Date());
 
   document.getElementById('wk-badge').textContent = 'This Week';
   document.getElementById('wk-title').textContent = getWeekLabel(wkLabel);
@@ -3783,8 +3819,27 @@ function renderWeek() {
     }).join('')}
   </div>`;
 
+  // Month pool: tasks planned for the current month but not yet assigned to a week
+  const monthPoolTasks = (S.weeklyTasks || []).filter(
+    t => t.monthKey === curMonthKey && !t.weekKey && !t.completed
+  );
+  const [mPoolYear, mPoolMo] = curMonthKey.split('-');
+  const mPoolLabel = new Date(+mPoolYear, +mPoolMo - 1, 1)
+    .toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+
   document.getElementById('week-container').innerHTML = `
-    <div class="wp-zone-title">Task Pool</div>
+    <div class="wp-zone-title">Month Pool · ${mPoolLabel}</div>
+    <div class="wp-zone-sub">Tasks planned for this month — drag into Week Pool or a day to schedule</div>
+    <div class="task-pool" id="wp-month-pool"
+        ondragover="event.preventDefault();this.classList.add('drag-over')"
+        ondragleave="wpDragLeave(event)"
+        ondrop="wpDropToMonth(event);this.classList.remove('drag-over')">
+      ${monthPoolTasks.length
+        ? monthPoolTasks.map(t => wpCardHTML(t, false)).join('')
+        : '<div class="task-pool-empty">No month-pool tasks · plan goals on the Monthly page, or add tasks here directly</div>'}
+    </div>
+
+    <div class="wp-zone-title">Week Pool</div>
     <div class="wp-zone-sub">Drag tasks into a day column · use the day selector on each card on mobile</div>
     <div class="task-pool" id="wp-pool"
         ondragover="event.preventDefault();this.classList.add('drag-over')"
@@ -3792,7 +3847,7 @@ function renderWeek() {
         ondrop="wpDrop(event,null);this.classList.remove('drag-over')">
       ${poolTasks.length
         ? poolTasks.map(t => wpCardHTML(t, false)).join('')
-        : '<div class="task-pool-empty">No unassigned tasks — add one below or drag back from a day</div>'}
+        : '<div class="task-pool-empty">No unassigned tasks — drag from Month Pool above or add one below</div>'}
     </div>
 
     <div class="wp-add-row">
@@ -3856,21 +3911,25 @@ function wpCardHTML(task, inColumn) {
       ${goal ? `<div class="pool-card-goal">🎯 ${goal.name}</div>` : ''}
       <div class="pool-card-bottom">
         ${task.isBacklog ? '<span class="backlog-badge">Backlog</span>' : ''}
-        <input class="pool-card-time" type="text" placeholder="+ time"
-          value="${task.proposedTime || ''}"
-          onblur="wpSaveTime('${task.id}',this.value)"
-          onkeydown="if(event.key==='Enter')this.blur()"
-          onclick="event.stopPropagation()">
-        ${inColumn
-          ? `<input type="checkbox" class="wp-check" ${task.completed?'checked':''}
-              onclick="wpToggleComplete('${task.id}')" title="Mark complete">`
-          : ''}
-        <select class="wp-day-sel"
-            onchange="wpAssignDay('${task.id}',this.value)"
-            onclick="event.stopPropagation()">
-          <option value=""${!task.assignedDay?' selected':''}>Pool</option>
-          ${dayOpts}
-        </select>
+        ${!task.weekKey ? '<span class="month-plan-badge">Month plan</span>' : ''}
+        ${!task.weekKey
+          ? `<button class="wp-promote-btn" onclick="event.stopPropagation();wpPromoteToWeek('${task.id}')" title="Add to this week">→ This week</button>`
+          : `<input class="pool-card-time" type="text" placeholder="+ time"
+              value="${task.proposedTime || ''}"
+              onblur="wpSaveTime('${task.id}',this.value)"
+              onkeydown="if(event.key==='Enter')this.blur()"
+              onclick="event.stopPropagation()">
+            ${inColumn
+              ? `<input type="checkbox" class="wp-check" ${task.completed?'checked':''}
+                  onclick="wpToggleComplete('${task.id}')" title="Mark complete">`
+              : ''}
+            <select class="wp-day-sel"
+                onchange="wpAssignDay('${task.id}',this.value)"
+                onclick="event.stopPropagation()">
+              <option value=""${!task.assignedDay?' selected':''}>Pool</option>
+              ${dayOpts}
+            </select>`
+        }
       </div>
     </div>
   </div>`;
@@ -3905,9 +3964,32 @@ function wpDrop(e, day) {
   const id = _wpDragId || e.dataTransfer.getData('text/plain');
   _wpDragId = null;
   if (!id) return;
-  updateWeeklyTask(id, { assignedDay: day || null });
+  const task = (S.weeklyTasks || []).find(t => t.id === id);
+  const updates = { assignedDay: day || null };
+  // Promote from month pool to current week when dropped into week pool or day column
+  if (task && !task.weekKey) {
+    updates.weekKey = getCurrentWeekKey(new Date());
+  }
+  updateWeeklyTask(id, updates);
   renderWeek();
   renderHome();
+}
+
+function wpDropToMonth(e) {
+  e.preventDefault();
+  const id = _wpDragId || e.dataTransfer.getData('text/plain');
+  _wpDragId = null;
+  if (!id) return;
+  updateWeeklyTask(id, { weekKey: null, assignedDay: null });
+  renderWeek();
+  renderHome();
+}
+
+function wpPromoteToWeek(id) {
+  updateWeeklyTask(id, { weekKey: getCurrentWeekKey(new Date()), assignedDay: null });
+  renderWeek();
+  renderHome();
+  toast('Added to this week ✓');
 }
 
 function wpAddTask() {
@@ -5391,7 +5473,11 @@ function renderMonthlyOpen() {
         <textarea class="mc-open-textarea" id="${cardId}"
           placeholder="This month's focus for this goal…"
           onblur="mcSavePlan('${monthKey}','${g.id}')">${planVal}</textarea>
-        <button class="mc-open-save-btn" onclick="mcSavePlan('${monthKey}','${g.id}')">Save ✓</button>
+        <div style="display:flex;gap:8px;align-self:flex-end">
+          <button class="mc-open-save-btn" onclick="mcSavePlan('${monthKey}','${g.id}')">Save ✓</button>
+          <button class="mc-open-save-btn" style="background:var(--accent);color:var(--accent-text)"
+            onclick="addGoalTaskToPool('${monthKey}','${g.id}')">→ Add to pool</button>
+        </div>
       </div>`;
     }).join('');
 
@@ -5434,6 +5520,25 @@ function mcSavePlan(monthKey, goalId) {
   S.monthPlan[monthKey][goalId] = { target: taEl.value, savedAt: Date.now() };
   saveState();
   toast('Plan saved ✓');
+}
+
+function addGoalTaskToPool(monthKey, goalId) {
+  const cardId = `mplan-${monthKey}-${goalId}`;
+  const taEl   = document.getElementById(cardId);
+  const text   = taEl ? taEl.value.trim() : '';
+  if (!text) { toast('Write a focus first, then add to pool'); return; }
+  const g = GOALS.find(x => String(x.id) === String(goalId));
+  // Save the plan entry too
+  mcSavePlan(monthKey, goalId);
+  addWeeklyTask({
+    text,
+    category: g ? g.cat : null,
+    goalId:   String(goalId),
+    monthKey,
+    weekKey:  null,
+    planned:  true,
+  });
+  toast('Added to month pool ✓');
 }
 
 // Kept for Qa backwards-compat — not called for Qb+ months.
