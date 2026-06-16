@@ -1410,6 +1410,63 @@ body {
   font-size: 10px; color: var(--warm-muted); font-style: italic; margin-top: -2px;
 }
 
+/* Win List */
+.win-list-section { margin-top: 36px; }
+.win-list-header {
+  font-family: 'Cormorant Garamond', serif; font-size: 20px;
+  font-weight: 700; color: var(--warm-dark); margin-bottom: 4px;
+}
+.win-list-total {
+  font-size: 11px; color: var(--warm-muted); margin-bottom: 18px; font-style: italic;
+}
+.win-list-add-row {
+  display: flex; gap: 8px; margin-bottom: 20px;
+}
+.win-list-add-input {
+  flex: 1; padding: 9px 14px; border: 1.5px solid var(--blush-deep);
+  border-radius: 10px; font-family: 'Poppins', sans-serif; font-size: 13px;
+  background: var(--linen); color: var(--warm-dark); outline: none;
+}
+.win-list-add-input:focus { border-color: var(--accent); }
+.win-list-cat-group { margin-bottom: 16px; }
+.win-list-cat-label {
+  font-size: 10px; font-weight: 800; letter-spacing: 1.5px;
+  text-transform: uppercase; color: var(--warm-muted); margin-bottom: 8px;
+}
+.win-list-task {
+  display: flex; align-items: flex-start; gap: 8px;
+  padding: 7px 12px; background: var(--white); border-radius: 8px;
+  border: 1px solid var(--blush); margin-bottom: 4px; font-size: 12px;
+  color: var(--warm-dark);
+}
+.win-list-task-dot {
+  width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; margin-top: 4px;
+}
+.win-list-task-goal { font-size: 10px; color: var(--warm-muted); margin-top: 2px; }
+
+/* Qb+ review close panel */
+.review-goal-row {
+  display: flex; align-items: flex-start; gap: 12px;
+  padding: 12px 16px; background: var(--white); border-radius: 10px;
+  border: 1px solid var(--blush); margin-bottom: 8px;
+}
+.review-goal-check { flex-shrink: 0; margin-top: 2px; }
+.review-goal-info { flex: 1; }
+.review-goal-name { font-size: 13px; font-weight: 600; color: var(--warm-dark); }
+.review-goal-target { font-size: 11px; color: var(--warm-muted); font-style: italic; margin-top: 3px; }
+.review-close-btn {
+  width: 100%; padding: 14px; border-radius: 12px; border: none;
+  background: var(--warm-dark); color: var(--surface);
+  font-family: 'Poppins', sans-serif; font-size: 14px; font-weight: 700;
+  cursor: pointer; margin-top: 24px; transition: opacity 0.15s;
+}
+.review-close-btn:hover { opacity: 0.88; }
+.review-closed-stamp {
+  text-align: center; padding: 18px;
+  font-family: 'Cormorant Garamond', serif; font-size: 18px;
+  font-weight: 700; color: var(--warm-muted); letter-spacing: 1px;
+}
+
 /* Panel divider */
 .mc-panel-divider {
   display: flex; align-items: center; gap: 14px; margin: 36px 0 28px;
@@ -3136,6 +3193,7 @@ if (!S.monthClosedCards) S.monthClosedCards = {};
 if (!S.monthOpenData) S.monthOpenData = {};
 if (!S.monthResetDone) S.monthResetDone = {};
 if (!S.monthPlan) S.monthPlan = {};
+if (!S.monthReview) S.monthReview = {};
 
 // habit view modes
 const habitViewMode = { daily:'weekly', weekly:'weekly' };
@@ -5304,26 +5362,94 @@ function mcHabitSummary(catMeta, monthInfo) {
 }
 
 function renderMonthlyClose() {
-  const monthInfo = mcPrevMonthInfo();
-  const prevWeeks = MC_MONTH_WEEKS[monthInfo.name] || [];
-
   const panel = document.getElementById('monthly-close-panel');
   if (!panel) return;
 
-  // For non-Qa previous months: close UI will be implemented in Step 7.
-  // For now just show the open (plan) panel.
-  if (!prevWeeks.length) {
-    panel.innerHTML = '';
-    renderMonthlyOpen();
-    return;
+  const prevMonthKey = getPrevMonthKey();
+  const prevWeeks    = MC_MONTH_WEEKS[mcPrevMonthInfo().name] || [];
+
+  if (prevWeeks.length) {
+    // Qa month — use existing per-category card system
+    const monthInfo = mcPrevMonthInfo();
+    panel.innerHTML = `
+      <div class="mc-close-section-label">${monthInfo.name} <em>Close</em></div>
+      <div class="mc-close-section-sub">${monthInfo.name} ${monthInfo.year} · Review each area and close the month</div>
+      <div class="mc-grid">${MC_CATS.map(cat => mcCardHTML(cat, monthInfo)).join('')}</div>`;
+  } else {
+    // Qb+ month — new review panel
+    panel.innerHTML = renderQbClosePanel(prevMonthKey);
   }
 
-  panel.innerHTML = `
-    <div class="mc-close-section-label">${monthInfo.name} <em>Close</em></div>
-    <div class="mc-close-section-sub">${monthInfo.name} ${monthInfo.year} · Review each area and close the month</div>
-    <div class="mc-grid">${MC_CATS.map(cat => mcCardHTML(cat, monthInfo)).join('')}</div>`;
-
   renderMonthlyOpen();
+}
+
+function renderQbClosePanel(monthKey) {
+  const [yr, mo]  = monthKey.split('-');
+  const mName     = new Date(+yr, +mo - 1, 1).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+  const review    = S.monthReview[monthKey] || {};
+  const isClosed  = !!review.closed;
+  const quarter   = getQuarterForMonth(monthKey);
+  const plan      = S.monthPlan[monthKey] || {};
+
+  // Goals that had a plan for this month
+  const plannedGoals = GOALS.filter(g => plan[g.id] && plan[g.id].target);
+
+  const goalRows = plannedGoals.map(g => {
+    const goalNum  = GOALS.indexOf(g) + 1;
+    const target   = plan[g.id].target;
+    const metKey   = `${monthKey}-${g.id}`;
+    const met      = !!(review.targetsMet || {})[g.id];
+    return `<div class="review-goal-row">
+      <input type="checkbox" class="review-goal-check" ${met ? 'checked' : ''} ${isClosed ? 'disabled' : ''}
+        onchange="mcToggleTargetMet('${monthKey}','${g.id}',this.checked)">
+      <div class="review-goal-info">
+        <div class="review-goal-name">G${goalNum} · ${g.name}</div>
+        <div class="review-goal-target">${quarter} plan: ${target}</div>
+      </div>
+    </div>`;
+  }).join('');
+
+  const notesVal = review.notes || '';
+
+  return `
+    <div class="mc-close-section-label">${mName} <em>Close</em></div>
+    <div class="mc-close-section-sub">${quarter} · Did your targets land?</div>
+
+    ${plannedGoals.length
+      ? `<div style="margin-bottom:20px">${goalRows}</div>`
+      : '<div style="font-size:12px;color:var(--warm-muted);margin-bottom:20px">No monthly plans set — go to Monthly Planning to set targets first.</div>'}
+
+    <div class="goal-form-row">
+      <label class="goal-form-label">Notes for this month</label>
+      <textarea class="goal-form-textarea" id="review-notes-${monthKey}"
+        ${isClosed ? 'readonly' : ''}
+        placeholder="What stood out? What carried forward?">${notesVal}</textarea>
+    </div>
+
+    ${winListHTML(monthKey, false)}
+
+    ${isClosed
+      ? `<div class="review-closed-stamp">✓ ${mName} closed on ${new Date(review.closedAt).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'})}</div>`
+      : `<button class="review-close-btn" onclick="mcCloseMonth('${monthKey}')">Close ${mName} →</button>`
+    }`;
+}
+
+function mcToggleTargetMet(monthKey, goalId, checked) {
+  if (!S.monthReview[monthKey]) S.monthReview[monthKey] = { targetsMet: {}, notes: '', closed: false };
+  if (!S.monthReview[monthKey].targetsMet) S.monthReview[monthKey].targetsMet = {};
+  S.monthReview[monthKey].targetsMet[goalId] = checked;
+  saveState();
+}
+
+function mcCloseMonth(monthKey) {
+  const notesEl = document.getElementById(`review-notes-${monthKey}`);
+  if (!S.monthReview[monthKey]) S.monthReview[monthKey] = { targetsMet: {}, notes: '', closed: false };
+  S.monthReview[monthKey].notes    = notesEl ? notesEl.value : '';
+  S.monthReview[monthKey].closed   = true;
+  S.monthReview[monthKey].closedAt = Date.now();
+  saveState();
+  mcDoMonthReset(monthKey);
+  toast('Month closed ✓ — tasks carried forward');
 }
 
 function mcCardHTML(cat, monthInfo) {
@@ -5414,6 +5540,76 @@ function mcCloseCard(cardKey) {
 // MONTHLY OPEN PANEL
 // ═══════════════════════════════════════════════════
 
+function winListHTML(monthKey, editable) {
+  const tasks = (S.weeklyTasks || []).filter(t => t.monthKey === monthKey && t.completed);
+  if (!tasks.length && !editable) return '';
+
+  // Group by category
+  const groups = {};
+  tasks.forEach(t => {
+    const cat = t.category || 'DEFAULT';
+    if (!groups[cat]) groups[cat] = [];
+    groups[cat].push(t);
+  });
+
+  const groupsHTML = Object.entries(groups).map(([cat, catTasks]) => {
+    const c = CAT_COLORS[cat] || CAT_COLORS.DEFAULT;
+    const label = cat === 'DEFAULT' ? 'Uncategorised' : cat.charAt(0) + cat.slice(1).toLowerCase();
+    const rows = catTasks.map(t => {
+      const goal = t.goalId ? GOALS.find(g => String(g.id) === String(t.goalId)) : null;
+      return `<div class="win-list-task">
+        <div class="win-list-task-dot" style="background:${c.border}"></div>
+        <div>
+          <div>${t.text}</div>
+          ${goal ? `<div class="win-list-task-goal">🎯 ${goal.name}</div>` : ''}
+          ${!t.planned ? '<div class="win-list-task-goal">⚡ Unplanned win</div>' : ''}
+        </div>
+      </div>`;
+    }).join('');
+    return `<div class="win-list-cat-group">
+      <div class="win-list-cat-label">${label}</div>
+      ${rows}
+    </div>`;
+  }).join('');
+
+  const [yr, mo] = monthKey.split('-');
+  const mName = new Date(+yr, +mo - 1, 1).toLocaleDateString('en-GB', { month: 'long' });
+  const catSel = Object.keys(CAT_COLORS).filter(k => k !== 'DEFAULT')
+    .map(c => `<option value="${c}">${c.charAt(0)+c.slice(1).toLowerCase()}</option>`).join('');
+
+  return `<div class="win-list-section">
+    <div class="win-list-header">${mName} <em>Wins</em> 🎉</div>
+    <div class="win-list-total">${tasks.length} task${tasks.length !== 1 ? 's' : ''} completed this month</div>
+    ${editable ? `<div class="win-list-add-row">
+      <input class="win-list-add-input" id="wl-add-text" placeholder="Log an unplanned win…"
+        onkeydown="if(event.key==='Enter')logAdHocWin('${monthKey}')">
+      <select class="wp-add-select" id="wl-add-cat" style="flex-shrink:0">
+        <option value="">Category</option>${catSel}
+      </select>
+      <button class="mc-open-save-btn" onclick="logAdHocWin('${monthKey}')">+ Log</button>
+    </div>` : ''}
+    ${groupsHTML || '<div style="font-size:12px;color:var(--warm-muted);font-style:italic;padding:8px 0">No completed tasks yet — tick tasks done in the Weekly view</div>'}
+  </div>`;
+}
+
+function logAdHocWin(monthKey) {
+  const textEl = document.getElementById('wl-add-text');
+  const catEl  = document.getElementById('wl-add-cat');
+  const text   = textEl ? textEl.value.trim() : '';
+  if (!text) { toast('Enter what you did'); return; }
+  addWeeklyTask({
+    text,
+    category:  catEl ? catEl.value || null : null,
+    monthKey,
+    weekKey:   null,
+    planned:   false,
+    completed: true,
+  });
+  if (textEl) textEl.value = '';
+  renderMonthlyClose();
+  toast('Win logged ✓');
+}
+
 function mcCurrMonthInfo() {
   const now = new Date();
   const m   = now.getMonth(); // 0-indexed
@@ -5499,7 +5695,8 @@ function renderMonthlyOpen() {
     </div>
     ${sections.length
       ? sections.join('')
-      : '<div style="padding:20px;color:var(--warm-muted);font-size:13px">No active goals. Add goals on the Goals page first.</div>'}`;
+      : '<div style="padding:20px;color:var(--warm-muted);font-size:13px">No active goals. Add goals on the Goals page first.</div>'}
+    ${winListHTML(monthKey, true)}`;
 
   // Divider between open/close panels
   const prevMonthKey = getPrevMonthKey();
