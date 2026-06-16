@@ -3156,6 +3156,28 @@ let S = loadState();
   try { localStorage.setItem('goga2026v2', JSON.stringify(S)); } catch {}
 })();
 
+(function runMigrationV6() {
+  if (S.schemaVersion >= 6) return;
+  // Mark all existing defs removable, then absorb custom arrays into the main defs
+  ['habitDefsDaily','habitDefsWeekly','habitDefsFreq'].forEach(key => {
+    if (S[key]) S[key] = S[key].map(h => ({ removable:true, ...h }));
+  });
+  if (S.customDailyHabits?.length) {
+    S.habitDefsDaily.push(...S.customDailyHabits.map(h => ({ removable:true, ...h })));
+  }
+  if (S.customWeeklyHabits?.length) {
+    S.habitDefsWeekly.push(...S.customWeeklyHabits.map(h => ({ removable:true, ...h })));
+  }
+  if (S.customFreqHabits?.length) {
+    S.habitDefsFreq.push(...S.customFreqHabits.map(h => ({ removable:true, ...h })));
+  }
+  S.customDailyHabits  = [];
+  S.customWeeklyHabits = [];
+  S.customFreqHabits   = [];
+  S.schemaVersion = 6;
+  try { localStorage.setItem('goga2026v2', JSON.stringify(S)); } catch {}
+})();
+
 // Live aliases — all existing code continues to read from these names.
 // `let` so syncDown can refresh them after merging a remote state blob.
 let GOALS              = S.goals;
@@ -3570,7 +3592,7 @@ function renderHome() {
   const allWeeklyTasks = getTasksForWeek(wkLabel);
 
   // ── TODAY'S SCORE — tasks assigned to today's day name ──
-  const allDaily = [...DEFAULT_DAILY, ...S.customDailyHabits];
+  const allDaily = DEFAULT_DAILY;
   const tk = todayKey();
   const todayHab = S.dailyHabits[tk] || {};
   const todayDayName = WP_DAYS[new Date().getDay() === 0 ? 6 : new Date().getDay() - 1];
@@ -3638,7 +3660,7 @@ function renderHome() {
   }).join('');
 
   // Frequency habits mini summary
-  const allFreq = [...DEFAULT_FREQ_HABITS, ...S.customFreqHabits];
+  const allFreq = DEFAULT_FREQ_HABITS;
   const fwk = freqWeekKey();
   habitsHTML += allFreq.map(h => {
     const sessions = (S.freqHabits[h.id]||{})[fwk]||[];
@@ -3778,7 +3800,7 @@ function deleteCustomWeekTask(e, wkKey, idx) {
 }
 
 function calcStreak() {
-  const allDaily = [...DEFAULT_DAILY,...S.customDailyHabits];
+  const allDaily = DEFAULT_DAILY;
   let streak=0;
   const today=new Date();
   for(let i=0;i<60;i++){
@@ -4125,7 +4147,7 @@ function switchHabitView(panel, mode, btn) {
 
 function renderDailyHabits() {
   const mode = habitViewMode.daily;
-  const allH = [...DEFAULT_DAILY,...S.customDailyHabits];
+  const allH = DEFAULT_DAILY;
   const el = document.getElementById('daily-habits-list');
   const today = new Date();
   const tk = todayKey();
@@ -4169,7 +4191,7 @@ function renderDailyHabits() {
             <span class="habit-name">${h.name}</span>
             ${missedToday ? '<span class="missed-badge">⚠ Do it today!</span>' : `<div class="habit-streak-badge ${streak===0?'zero':''}">${streak===0?'Start today!':'🔥 '+streak+' days'}</div>`}
           </div>
-          ${h.custom?`<button class="habit-del-btn" onclick="deleteHabit('daily','${h.id}')">✕</button>`:''}
+          ${h.removable!==false?`<button class="habit-del-btn" onclick="deleteHabit('daily','${h.id}')">✕</button>`:''}
         </div>
         <div class="monthly-summary">
           <span class="monthly-summary-label">${daysDone}/${daysSoFar} days this month</span>
@@ -4210,7 +4232,7 @@ function renderDailyHabits() {
             <span class="habit-name">${h.name}</span>
             ${missedToday ? '<span class="missed-badge">⚠ Do it today!</span>' : `<div class="habit-streak-badge ${streak===0?'zero':''}">${streak===0?'Start today!':'🔥 '+streak}</div>`}
           </div>
-          ${h.custom?`<button class="habit-del-btn" onclick="deleteHabit('daily','${h.id}')">✕</button>`:''}
+          ${h.removable!==false?`<button class="habit-del-btn" onclick="deleteHabit('daily','${h.id}')">✕</button>`:''}
         </div>
         <div class="monthly-summary">
           <span class="monthly-summary-label">${daysDone}/${daysSoFar} days this month</span>
@@ -4224,7 +4246,7 @@ function renderDailyHabits() {
 }
 
 function renderWeeklyHabits() {
-  const allH = [...DEFAULT_WEEKLY,...S.customWeeklyHabits];
+  const allH = DEFAULT_WEEKLY;
   const el = document.getElementById('weekly-habits-list');
   const today = new Date();
   const year = today.getFullYear();
@@ -4277,7 +4299,7 @@ function renderWeeklyHabits() {
             ? `<span class="missed-badge">⚠ Not done this week</span>`
             : `<div class="habit-streak-badge">✓ Done this week</div>`}
         </div>
-        ${h.custom?`<button class="habit-del-btn" onclick="deleteHabit('weekly','${h.id}')">✕</button>`:''}
+        ${h.removable!==false?`<button class="habit-del-btn" onclick="deleteHabit('weekly','${h.id}')">✕</button>`:''}
       </div>
       <div class="monthly-summary">
         <span class="monthly-summary-label">${doneCount}/${totalWks} weeks in ${monthName}</span>
@@ -4304,7 +4326,7 @@ function toggleWeeklyHabitWk(wkKey, hid) {
 function renderFreqHabits() {
   const el = document.getElementById('freq-habits-list');
   if (!el) return;
-  const allH = [...DEFAULT_FREQ_HABITS, ...S.customFreqHabits];
+  const allH = DEFAULT_FREQ_HABITS;
   const wkKey = freqWeekKey();
   const today = new Date();
 
@@ -4350,7 +4372,7 @@ function renderFreqHabits() {
             ? `<span class="missed-badge">⚠ ${done}/${h.freq} this week</span>`
             : `<div class="habit-streak-badge">✓ ${done}/${h.freq} done</div>`}
         </div>
-        ${h.custom ? `<button class="habit-del-btn" onclick="deleteFreqHabit('${h.id}')">✕</button>` : ''}
+        ${h.removable!==false ? `<button class="habit-del-btn" onclick="deleteFreqHabit('${h.id}')">✕</button>` : ''}
       </div>
       <div class="monthly-summary">
         <span class="monthly-summary-label">${monthTotal} sessions this month</span>
@@ -4367,7 +4389,7 @@ function tapFreq(hid) {
   const wkKey = freqWeekKey();
   if (!S.freqHabits[hid]) S.freqHabits[hid] = {};
   if (!S.freqHabits[hid][wkKey]) S.freqHabits[hid][wkKey] = [];
-  const h = [...DEFAULT_FREQ_HABITS,...S.customFreqHabits].find(x=>x.id===hid);
+  const h = DEFAULT_FREQ_HABITS.find(x=>x.id===hid);
   if (!h || S.freqHabits[hid][wkKey].length >= h.freq) return;
   S.freqHabits[hid][wkKey].push(shortDayLabel());
   saveState(); renderFreqHabits(); renderHome();
@@ -4397,7 +4419,7 @@ function saveFreqHabit() {
   const icon = document.getElementById('freq-icon-input').value.trim() || '⭐';
   const freq = parseInt(document.getElementById('freq-num-input').value) || 2;
   if (!name) { toast('Please enter a habit name'); return; }
-  S.customFreqHabits.push({ id:'freq-custom-'+Date.now(), name, icon, freq, custom:true });
+  DEFAULT_FREQ_HABITS.push({ id:'freq-custom-'+Date.now(), name, icon, freq, removable:true });
   document.getElementById('freq-name-input').value = '';
   document.getElementById('freq-icon-input').value = '';
   document.getElementById('freq-num-input').value = '2';
@@ -4406,7 +4428,10 @@ function saveFreqHabit() {
   toast('Frequency habit added!');
 }
 function deleteFreqHabit(hid) {
-  S.customFreqHabits = S.customFreqHabits.filter(h=>h.id!==hid);
+  const h = DEFAULT_FREQ_HABITS.find(x => x.id === hid);
+  if (!h) return;
+  if (!confirm(`Remove "${h.name}" habit?`)) return;
+  DEFAULT_FREQ_HABITS.splice(DEFAULT_FREQ_HABITS.indexOf(h), 1);
   saveState(); renderFreqHabits();
 }
 
@@ -4491,10 +4516,9 @@ function addCustomHabit(type) {
   const inp = document.getElementById(`${type}-add-input`);
   const name = inp.value.trim();
   if(!name) return;
-  const id = 'custom_'+Date.now();
-  const habit = { id, name, icon:'⭐', custom:true };
-  if(type==='daily') { habit.target=1; S.customDailyHabits.push(habit); }
-  else { habit.target=1; S.customWeeklyHabits.push(habit); }
+  const habit = { id:'custom_'+Date.now(), name, icon:'⭐', target:1, removable:true };
+  if(type==='daily') DEFAULT_DAILY.push(habit);
+  else DEFAULT_WEEKLY.push(habit);
   inp.value='';
   saveState();
   if(type==='daily') renderDailyHabits();
@@ -4503,8 +4527,11 @@ function addCustomHabit(type) {
 }
 
 function deleteHabit(type, id) {
-  if(type==='daily') S.customDailyHabits = S.customDailyHabits.filter(h=>h.id!==id);
-  else S.customWeeklyHabits = S.customWeeklyHabits.filter(h=>h.id!==id);
+  const arr = type === 'daily' ? DEFAULT_DAILY : DEFAULT_WEEKLY;
+  const h = arr.find(x => x.id === id);
+  if (!h) return;
+  if (!confirm(`Remove "${h.name}" habit?`)) return;
+  arr.splice(arr.indexOf(h), 1);
   saveState(); renderHabits();
 }
 
@@ -5025,7 +5052,7 @@ function renderPlanner(offset) {
   intentionEl.value = S.intentions[wkIntentKey] || '';
   intentionEl.dataset.key = wkIntentKey;
 
-  const allDaily = [...DEFAULT_DAILY,...S.customDailyHabits].slice(0,4);
+  const allDaily = DEFAULT_DAILY.slice(0,4);
   const days=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
 
   // Check if this is Sunday render
@@ -5330,9 +5357,9 @@ function mcCompletedMilestones(catKey, monthWeeks) {
 }
 
 function mcHabitSummary(catMeta, monthInfo) {
-  const allH = [...DEFAULT_DAILY, ...S.customDailyHabits];
-  const wklyH = [...DEFAULT_WEEKLY, ...S.customWeeklyHabits];
-  const freqH = [...DEFAULT_FREQ_HABITS, ...S.customFreqHabits];
+  const allH = DEFAULT_DAILY;
+  const wklyH = DEFAULT_WEEKLY;
+  const freqH = DEFAULT_FREQ_HABITS;
   const weeks = MC_MONTH_WEEKS[monthInfo.name] || [];
   const lines = [];
 
