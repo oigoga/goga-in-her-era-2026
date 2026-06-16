@@ -2679,7 +2679,7 @@ setTimeout(() => { applyTheme(); setInterval(applyTheme, 86400000); }, _msToMidn
 // ═══════════════════════════════════════════════════
 // DATA
 // ═══════════════════════════════════════════════════
-const GOALS = [
+const GOALS_DEFAULT = [
   { id:1, cat:'FAITH', name:'Study the Bible Consistently', status:'in-progress',
     decision:'Continue', rewrite:'Finish the Bible in a Year Bible Plan',
     qa:'Catch up (14 days behind) and stay consistent — read one book',
@@ -2828,6 +2828,14 @@ const GOALS = [
 const WEEK_KEYS = ['Mar Wk1','Mar Wk2','Mar Wk3','Mar Wk4','Mar-Apr Wk5','Apr Wk6','Apr Wk7','Apr Wk8','Apr-May Wk9','May Wk10','May Wk11','May Wk12','May Wk13'];
 const WEEK_RANGES = ['Mar 1–8','Mar 8–15','Mar 15–22','Mar 22–29','Mar 29–Apr 5','Apr 5–12','Apr 12–19','Apr 19–26','Apr 26–May 3','May 3–10','May 10–17','May 17–24','May 24–31'];
 
+// Qa old-format week labels → evergreen keys. Used in v4 migration and custom task migration.
+const QA_WEEK_REMAP = {
+  'Mar Wk1':'2026-03-w1', 'Mar Wk2':'2026-03-w2', 'Mar Wk3':'2026-03-w3',
+  'Mar Wk4':'2026-03-w4', 'Mar-Apr Wk5':'2026-03-w5',
+  'Apr Wk6':'2026-04-w1', 'Apr Wk7':'2026-04-w2', 'Apr Wk8':'2026-04-w3', 'Apr-May Wk9':'2026-04-w4',
+  'May Wk10':'2026-05-w1','May Wk11':'2026-05-w2','May Wk12':'2026-05-w3','May Wk13':'2026-05-w4',
+};
+
 // Week boundary: each week starts Sun at 2pm from Mar 1 2026 2pm
 const QA_START = new Date(2026, 2, 1, 14, 0, 0); // Mar 1 2026 2:00pm
 
@@ -2841,14 +2849,14 @@ const AFFIRMATIONS = [
   { text:'Grace for every week. Strength for every task. She is enough.', ref:'Isaiah 40:31' },
 ];
 
-const DEFAULT_DAILY = [
+const DEFAULT_DAILY_DEF = [
   { id:'bible',    name:'Bible Reading',    icon:'📖' },
   { id:'prayer',   name:'Prayer Time',      icon:'🙏' },
   { id:'social',   name:'Post on Social',   icon:'📱' },
   { id:'journal',  name:'Journal / Reflect',icon:'✍️' },
 ];
 
-const DEFAULT_WEEKLY = [
+const DEFAULT_WEEKLY_DEF = [
   { id:'church',  name:'Church',             icon:'⛪',  target:1 },
   { id:'family',  name:'Family Calls',       icon:'📞',  target:1 },
   { id:'reading', name:'Reading (books)',    icon:'📚',  target:1 },
@@ -2857,7 +2865,7 @@ const DEFAULT_WEEKLY = [
 
 // Frequency habits — N sessions per week, each logged with a day stamp
 // Category colours for planner tasks
-const CAT_COLORS = {
+const CAT_COLORS_DEFAULT = {
   FAITH:         { bg:'#f0eaf8', border:'#b89fd4', text:'#6b4a9b' },
   MONEY:         { bg:'#eaf5ea', border:'#7eba7e', text:'#2d6e2d' },
   BUSINESS:      { bg:'#fff3e0', border:'#ffb347', text:'#8a5500' },
@@ -2871,7 +2879,7 @@ const CAT_COLORS = {
 
 const TIME_BLOCKS = ['🌅 Morning', '🔥 Deep Work', '🌤 Afternoon', '🌙 Evening'];
 
-const DEFAULT_FREQ_HABITS = [
+const DEFAULT_FREQ_HABITS_DEF = [
   { id:'freq-gym',      name:'Gym',       icon:'🏋️', freq:3 },
   { id:'freq-upskill',  name:'Upskilling (90m blocks)', icon:'📚', freq:2 },
 ];
@@ -2924,8 +2932,13 @@ async function syncDown() {
   showSyncStatus('syncing');
   const remote = await cloudGet('goga2026_state');
   if (remote) {
-    // merge remote into local — remote wins
     S = { ...S, ...remote };
+    // Refresh aliases so UI reads from the merged remote data
+    if (S.goals)           GOALS               = S.goals;
+    if (S.catColors)       CAT_COLORS          = S.catColors;
+    if (S.habitDefsDaily)  DEFAULT_DAILY       = S.habitDefsDaily;
+    if (S.habitDefsWeekly) DEFAULT_WEEKLY      = S.habitDefsWeekly;
+    if (S.habitDefsFreq)   DEFAULT_FREQ_HABITS = S.habitDefsFreq;
     saveLocal();
   }
   showSyncStatus('synced');
@@ -2961,11 +2974,46 @@ function showSyncStatus(status) {
 }
 
 // ═══════════════════════════════════════════════════
-// STATE
+// STATE + MIGRATION
 // ═══════════════════════════════════════════════════
 function loadState() { try { return JSON.parse(localStorage.getItem('goga2026v2')||'{}'); } catch { return {}; } }
 
 let S = loadState();
+
+// Schema v3: lift hardcoded constants into S so goals, categories and habit
+// definitions can be persisted, synced and eventually edited. Runs once.
+(function runMigrationV3() {
+  if (S.schemaVersion >= 3) return;
+  S._backupV2       = JSON.parse(JSON.stringify(S));
+  S.goals           = JSON.parse(JSON.stringify(GOALS_DEFAULT));
+  S.catColors       = JSON.parse(JSON.stringify(CAT_COLORS_DEFAULT));
+  S.habitDefsDaily  = JSON.parse(JSON.stringify(DEFAULT_DAILY_DEF));
+  S.habitDefsWeekly = JSON.parse(JSON.stringify(DEFAULT_WEEKLY_DEF));
+  S.habitDefsFreq   = JSON.parse(JSON.stringify(DEFAULT_FREQ_HABITS_DEF));
+  S.schemaVersion   = 3;
+  try { localStorage.setItem('goga2026v2', JSON.stringify(S)); } catch {}
+})();
+
+// Schema v4: remap weeklyTasks.weekKey from Qa labels ('Mar Wk1') to evergreen keys ('2026-03-w1').
+(function runMigrationV4() {
+  if (S.schemaVersion >= 4) return;
+  if (S.weeklyTasks) {
+    S.weeklyTasks = S.weeklyTasks.map(t => ({
+      ...t, weekKey: QA_WEEK_REMAP[t.weekKey] || t.weekKey,
+    }));
+  }
+  S.schemaVersion = 4;
+  try { localStorage.setItem('goga2026v2', JSON.stringify(S)); } catch {}
+})();
+
+// Live aliases — all existing code continues to read from these names.
+// `let` so syncDown can refresh them after merging a remote state blob.
+let GOALS              = S.goals;
+let CAT_COLORS         = S.catColors;
+let DEFAULT_DAILY      = S.habitDefsDaily;
+let DEFAULT_WEEKLY     = S.habitDefsWeekly;
+let DEFAULT_FREQ_HABITS = S.habitDefsFreq;
+
 if (!S.weekTasks) S.weekTasks = {};
 if (!S.dailyHabits) S.dailyHabits = {};
 if (!S.weeklyHabits) S.weeklyHabits = {};
@@ -2973,7 +3021,7 @@ if (!S.goalProgress) S.goalProgress = {};
 if (!S.goalNotes) S.goalNotes = {};
 if (!S.milestonesDone) S.milestonesDone = {};
 if (!S.milestoneEdits) S.milestoneEdits = {};
-// Re-apply persisted milestone text edits into the GOALS array
+// Re-apply persisted milestone text edits into S.goals (runs after alias is set)
 Object.entries(S.milestoneEdits).forEach(([milKey, text]) => {
   const dashIdx = milKey.indexOf('-');
   const goalId  = parseInt(milKey.slice(0, dashIdx), 10);
@@ -2986,14 +3034,14 @@ if (!S.intentions) S.intentions = {};
 if (!S.customDailyHabits) S.customDailyHabits = [];
 if (!S.customWeeklyHabits) S.customWeeklyHabits = [];
 if (!S.customWeekTasks) S.customWeekTasks = {};
-if (!S.freqHabits) S.freqHabits = {};       // { 'freq-gym': { '2026-2-wk1': ['Mon 3','Thu 6'] } }
-if (!S.sundayRefresh) S.sundayRefresh = {};  // { '2026-2-wk1': { 'sr-plan': true, ... } }
+if (!S.freqHabits) S.freqHabits = {};
+if (!S.sundayRefresh) S.sundayRefresh = {};
 if (!S.customFreqHabits) S.customFreqHabits = [];
-if (!S.weeklyTasks) S.weeklyTasks = [];     // unified task model — see addWeeklyTask()
-if (!S.monthCloseData) S.monthCloseData = {};    // { 'Mar-FAITH': { completed, didNot } }
-if (!S.monthClosedCards) S.monthClosedCards = {}; // { 'Mar-FAITH': true }
-if (!S.monthOpenData) S.monthOpenData = {};       // { 'Apr-FAITH': { milestones: '' } }
-if (!S.monthResetDone) S.monthResetDone = {};     // { 'Mar': true }
+if (!S.weeklyTasks) S.weeklyTasks = [];
+if (!S.monthCloseData) S.monthCloseData = {};
+if (!S.monthClosedCards) S.monthClosedCards = {};
+if (!S.monthOpenData) S.monthOpenData = {};
+if (!S.monthResetDone) S.monthResetDone = {};
 
 // habit view modes
 const habitViewMode = { daily:'weekly', weekly:'weekly' };
@@ -3004,14 +3052,66 @@ const habitViewMode = { daily:'weekly', weekly:'weekly' };
 function dayKey(d) { return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`; }
 function todayKey() { return dayKey(new Date()); }
 
-// Key for the current Qa week (Sun 2pm → Sun 1:59pm) — used for frequency habits & sunday refresh
-function freqWeekKey(d) {
-  const dt = d || new Date();
-  const ms = dt - QA_START;
-  if (ms < 0) return 'qa-wk0';
-  const idx = Math.max(0, Math.min(12, Math.floor(ms / (7 * 24 * 60 * 60 * 1000))));
-  return `qa-wk${idx}`;
+// ── Evergreen time: all periods computed from the date, never from frozen arrays ──
+
+function getMonthKey(date) {
+  const d = date || new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
 }
+
+// Returns [{key, start, end}] for every week whose Sunday-at-2pm falls within the given month.
+// A week belongs to the month of its Sunday start date.
+function getWeeksForMonth(monthKey) {
+  const [year, month] = monthKey.split('-').map(Number);
+  const monthIdx = month - 1;
+  const weeks = [];
+  for (let day = 1; day <= 31; day++) {
+    const d = new Date(year, monthIdx, day);
+    if (d.getMonth() !== monthIdx) break;
+    if (d.getDay() !== 0) continue; // only Sundays
+    const start = new Date(year, monthIdx, day, 14, 0, 0);
+    weeks.push({
+      key:   `${year}-${String(month).padStart(2,'0')}-w${weeks.length + 1}`,
+      start,
+      end:   new Date(start.getTime() + 7 * 86400000),
+    });
+  }
+  return weeks;
+}
+
+// Returns the week key (e.g. '2026-06-w2') that the given date falls into.
+// Weeks start Sunday at 2pm; the week belongs to the month of its Sunday start.
+function getCurrentWeekKey(date) {
+  const d = date || new Date();
+  const dayOfWeek = d.getDay(); // 0 = Sunday
+  const wkStart = new Date(d);
+  wkStart.setDate(d.getDate() - dayOfWeek);
+  wkStart.setHours(14, 0, 0, 0);
+  if (d < wkStart) wkStart.setDate(wkStart.getDate() - 7); // before 2pm on Sunday
+  const wsMonth = wkStart.getMonth() + 1;
+  const wsYear  = wkStart.getFullYear();
+  const monthKey = `${wsYear}-${String(wsMonth).padStart(2,'0')}`;
+  const weeks = getWeeksForMonth(monthKey);
+  const w = weeks.find(x => x.start.getTime() === wkStart.getTime());
+  return w ? w.key : monthKey + '-w1';
+}
+
+// Human-readable range for a week key, e.g. '2026-06-w2' → '14 Jun – 20 Jun'
+function getWeekLabel(weekKey) {
+  const parts = weekKey.split('-');
+  if (parts.length < 3) return weekKey;
+  const monthKey = `${parts[0]}-${parts[1]}`;
+  const weeks = getWeeksForMonth(monthKey);
+  const w = weeks.find(x => x.key === weekKey);
+  if (!w) return weekKey;
+  const fmt = d => d.toLocaleDateString('en-GB', { day:'numeric', month:'short' });
+  const lastDay = new Date(w.end.getTime() - 86400000); // Saturday before next Sunday
+  return `${fmt(w.start)} – ${fmt(lastDay)}`;
+}
+
+// Week key for habits and Sunday refresh — now evergreen (delegates to getCurrentWeekKey).
+// Old Qa habit data stays under 'qa-wk*' keys and remains accessible for history.
+function freqWeekKey(d) { return getCurrentWeekKey(d || new Date()); }
 
 // Short day label like "Mon 9"
 function shortDayLabel(d) {
@@ -3085,19 +3185,22 @@ function getTasksForDay(weekKey, day) {
 }
 
 // Auto-carry incomplete tasks from any previous week into the current week's pool.
-// Safe to call repeatedly — once tasks are in the current week they won't be touched again.
+// Safe to call repeatedly — tasks already in the current week are not touched again.
 function carryForwardIncompleteTasks() {
-  const wk = getWeekIdx();
-  if (wk === 0) return;
+  const currentWkKey = getCurrentWeekKey(new Date());
+  const currentMonthKey = currentWkKey.slice(0, 7);
+  const currentWeeks = getWeeksForMonth(currentMonthKey);
+  const currentStart = (currentWeeks.find(w => w.key === currentWkKey) || {}).start;
+  if (!currentStart) return;
 
-  const currentWkLabel = WEEK_KEYS[wk];
   let carried = 0;
-
   S.weeklyTasks = (S.weeklyTasks || []).map(t => {
-    const taskWkIdx = WEEK_KEYS.indexOf(t.weekKey);
-    if (taskWkIdx >= 0 && taskWkIdx < wk && !t.completed) {
+    if (!t.weekKey || t.weekKey === currentWkKey || t.completed) return t;
+    const tMonthKey = t.weekKey.slice(0, 7);
+    const tWeek = getWeeksForMonth(tMonthKey).find(w => w.key === t.weekKey);
+    if (tWeek && tWeek.start < currentStart) {
       carried++;
-      return { ...t, weekKey: currentWkLabel, isBacklog: true, assignedDay: null };
+      return { ...t, weekKey: currentWkKey, isBacklog: true, assignedDay: null };
     }
     return t;
   });
@@ -3108,15 +3211,15 @@ function carryForwardIncompleteTasks() {
   }
 }
 
-// One-time migration: lift customWeekTasks entries into weeklyTasks.
-// Completion state is read from the legacy S.weekTasks boolean map.
+// One-time migration: lift customWeekTasks entries into weeklyTasks with evergreen keys.
 // Runs only once (guarded by S._migratedCustomWeekTasks flag).
 function migrateCustomWeekTasks() {
   if (!S.customWeekTasks || S._migratedCustomWeekTasks) return;
   Object.entries(S.customWeekTasks).forEach(([wkKey, tasks]) => {
     if (!Array.isArray(tasks) || tasks.length === 0) return;
-    const wkIdx   = parseInt(wkKey.replace('wk', ''), 10);
-    const weekKey = WEEK_KEYS[wkIdx];
+    const wkIdx    = parseInt(wkKey.replace('wk', ''), 10);
+    const oldLabel = WEEK_KEYS[wkIdx];
+    const weekKey  = QA_WEEK_REMAP[oldLabel] || oldLabel;
     if (!weekKey) return;
     const legacyDone = S.weekTasks?.[wkKey] || {};
     tasks.forEach((ct, i) => {
@@ -3248,11 +3351,9 @@ function renderHome() {
   document.getElementById('hero-ref').textContent = aff.ref;
   document.getElementById('sidebar-verse').textContent = `"${aff.text}" — ${aff.ref}`;
 
-  const wk = getWeekIdx();
-  const actualWk = getActualWeekIdx();
-  document.getElementById('s-week').textContent = wk+1;
-
-  const wkLabel = WEEK_KEYS[wk];
+  const wkLabel = getCurrentWeekKey(new Date());
+  const wkNum = parseInt(wkLabel.split('-w')[1]) || 1;
+  document.getElementById('s-week').textContent = wkNum;
   const allWeeklyTasks = getTasksForWeek(wkLabel);
 
   // ── TODAY'S SCORE — tasks assigned to today's day name ──
@@ -3433,7 +3534,7 @@ function homeAddTodayTask() {
   if (!text) { if (inp) inp.focus(); return; }
   const now2 = new Date();
   const todayDay = WP_DAYS[now2.getDay() === 0 ? 6 : now2.getDay() - 1];
-  const wkLabel  = WEEK_KEYS[getWeekIdx()];
+  const wkLabel  = getCurrentWeekKey(new Date());
   addWeeklyTask({ text, weekKey: wkLabel, assignedDay: todayDay });
   inp.value = '';
   renderHome();
@@ -3501,12 +3602,11 @@ function wpSetMobileDay(day) {
 }
 
 function renderWeek() {
-  carryForwardIncompleteTasks(); // no-op if already run for this week
-  const wk = getWeekIdx();
-  const wkLabel = WEEK_KEYS[wk];
+  carryForwardIncompleteTasks(); // no-op if tasks already in current week
+  const wkLabel = getCurrentWeekKey(new Date());
 
-  document.getElementById('wk-badge').textContent = `Qa Week ${wk+1}`;
-  document.getElementById('wk-title').textContent = WEEK_RANGES[wk];
+  document.getElementById('wk-badge').textContent = 'This Week';
+  document.getElementById('wk-title').textContent = getWeekLabel(wkLabel);
 
   // Progress from weeklyTasks
   const allWkTasks = getTasksForWeek(wkLabel);
@@ -3587,7 +3687,7 @@ function renderWeek() {
       <button class="wp-add-btn" onclick="wpAddTask()">+ Add</button>
     </div>
 
-    <div class="wp-zone-title">This Week · ${WEEK_RANGES[wk]}</div>
+    <div class="wp-zone-title">This Week · ${getWeekLabel(wkLabel)}</div>
     ${mobileTabsHTML}
     <div class="wp-day-grid">${dayColsHTML}</div>
   `;
@@ -3696,7 +3796,7 @@ function wpAddTask() {
   const goalSel = document.getElementById('wp-goal-select');
   const text = inp ? inp.value.trim() : '';
   if (!text) { if (inp) inp.focus(); return; }
-  const wkLabel = WEEK_KEYS[getWeekIdx()];
+  const wkLabel = getCurrentWeekKey(new Date());
   addWeeklyTask({
     text,
     category:     catSel.value  || null,
@@ -3870,20 +3970,16 @@ function renderWeeklyHabits() {
   const year = today.getFullYear();
   const month = today.getMonth();
 
-  // Build weeks using Qa 7-day boundaries (Sun 2pm → Sun 1:59pm)
-  // Only include weeks that overlap with the current calendar month
-  const weeks = [];
-  for (let i = 0; i < 13; i++) {
-    const wkStart = new Date(QA_START.getTime() + i * 7 * 24 * 60 * 60 * 1000);
-    const wkEnd   = new Date(wkStart.getTime() + 7 * 24 * 60 * 60 * 1000 - 1);
-    // Only include if this week overlaps with current month
-    const overlaps = wkStart.getMonth() === month || wkEnd.getMonth() === month ||
-      (wkStart.getMonth() < month && wkEnd.getMonth() > month);
-    if (!overlaps) continue;
-    const wkKey = `qa-wk${i}`;
-    const isCurrent = today >= wkStart && today < new Date(wkStart.getTime() + 7 * 24 * 60 * 60 * 1000);
-    weeks.push({ wkNum: i+1, wkStart, wkEnd, wkKey, isCurrent });
-  }
+  // Build weeks for the current calendar month using evergreen date logic
+  const currentWkKey = getCurrentWeekKey(today);
+  const monthKey = `${year}-${String(month + 1).padStart(2, '0')}`;
+  const weeks = getWeeksForMonth(monthKey).map((w, i) => ({
+    wkNum:     i + 1,
+    wkStart:   w.start,
+    wkEnd:     new Date(w.end.getTime() - 1),
+    wkKey:     w.key,
+    isCurrent: w.key === currentWkKey,
+  }));
 
   const monthName = today.toLocaleDateString('en-GB',{month:'long'});
 
