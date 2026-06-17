@@ -1193,79 +1193,6 @@ body {
 
 .q-prog-pct { font-size:11px; font-weight:700; color:var(--warm-dark); }
 
-/* Weekly milestones accordion */
-.goal-card-bottom {
-  border-top:1px solid var(--parchment);
-  overflow:hidden;
-}
-
-.milestones-toggle {
-  width:100%; padding:12px 20px;
-  background:none; border:none;
-  display:flex; align-items:center; justify-content:space-between;
-  cursor:pointer; font-family:'Poppins',sans-serif;
-  font-size:12px; font-weight:700; color:var(--warm-mid);
-  transition:background 0.2s;
-}
-.milestones-toggle:hover { background:var(--linen); }
-
-.toggle-arrow {
-  font-size:10px; transition:transform 0.3s;
-}
-.toggle-arrow.open { transform:rotate(180deg); }
-
-.milestones-body {
-  max-height:0; overflow:hidden;
-  transition:max-height 0.4s ease;
-}
-.milestones-body.open { max-height:600px; }
-
-.milestone-row {
-  display:flex; align-items:flex-start; gap:10px;
-  padding:10px 20px;
-  border-bottom:1px solid var(--parchment);
-  transition:background 0.15s;
-}
-.milestone-row:last-child { border-bottom:none; }
-.milestone-row.locked { opacity:0.4; pointer-events:none; }
-.milestone-row.completed { background:#f0fdf4; }
-.milestone-row:hover:not(.locked) { background:var(--linen); }
-
-.milestone-check {
-  width:18px; height:18px; border-radius:50%;
-  border:2px solid var(--blush-deep);
-  display:flex; align-items:center; justify-content:center;
-  flex-shrink:0; margin-top:1px; font-size:9px; font-weight:800;
-  color:#fff; cursor:pointer; transition:all 0.2s;
-}
-.milestone-check.done { background:var(--sage); border-color:var(--sage); }
-.milestone-check.locked-icon { background:var(--parchment); color:var(--warm-muted); border-color:var(--blush); cursor:not-allowed; }
-
-.milestone-content { flex:1; }
-.milestone-week { font-size:10px; font-weight:700; color:var(--rose); margin-bottom:2px; text-transform:uppercase; letter-spacing:0.5px; }
-.milestone-text {
-  font-size:12px; line-height:1.5; color:var(--warm-dark); font-weight:500;
-  cursor:text; border-radius:4px; padding:1px 3px; margin:-1px -3px;
-  transition:background 0.15s;
-}
-.milestone-text:hover { background:var(--parchment); }
-.milestone-edit-wrap { display:flex; align-items:center; gap:6px; margin-top:2px; }
-.milestone-edit-input {
-  flex:1; font-size:12px; font-family:'Poppins',sans-serif; font-weight:500;
-  color:var(--warm-dark); border:1.5px solid var(--rose); border-radius:6px;
-  padding:4px 8px; outline:none; background:var(--white); line-height:1.5;
-}
-.milestone-save-btn {
-  font-size:11px; font-weight:700; font-family:'Poppins',sans-serif;
-  background:var(--rose); color:#fff; border:none; border-radius:6px;
-  padding:4px 10px; cursor:pointer; white-space:nowrap; flex-shrink:0;
-}
-.milestone-save-btn:hover { background:var(--rose-dark); }
-.milestone-cancel-btn {
-  font-size:11px; font-weight:700; font-family:'Poppins',sans-serif;
-  background:none; color:var(--warm-muted); border:1px solid var(--blush-deep);
-  border-radius:6px; padding:4px 8px; cursor:pointer; flex-shrink:0;
-}
 /* ═══════════════════════════════════════
    MONTHLY CLOSE PANEL
 ═══════════════════════════════════════ */
@@ -1968,10 +1895,6 @@ input[type=range] {
   .goal-card-name { font-size: 15px; }
   .goal-card-progress { padding: 0 16px 12px; }
   .q-progress-row { grid-template-columns: 1fr 1fr 1fr; gap: 4px; }
-  .goal-card-bottom { }
-  .milestone-row { padding: 9px 14px; }
-  .milestone-week { font-size: 9px; }
-  .milestone-text { font-size: 12px; }
   .yearly-goals-footer { margin-top: 28px; padding: 20px 16px; }
 
   /* ── HABITS ── */
@@ -4550,17 +4473,14 @@ let currentCatFilter = 'ALL';
 function renderGoals(filter) {
   currentCatFilter = filter;
   const list = filter==='ALL'?GOALS:GOALS.filter(g=>g.cat===filter);
-  const wk = getWeekIdx();
-
   renderCatFilters();
   const countEl = document.getElementById('goals-page-count');
   if (countEl) countEl.textContent = `${GOALS.length} Goals`;
 
-  // Inactive = 0% progress AND no milestones ticked → sorted last + dimmed
+  // Inactive = 0% progress → sorted last + dimmed
   const isInactive = g => {
     const prog = S.goalProgress[g.id] !== undefined ? S.goalProgress[g.id] : (g.progress || 0);
-    if (prog > 0) return false;
-    return !Object.keys(g.weekly || {}).some(wkL => S.milestonesDone[`${g.id}-${wkL}`]);
+    return prog === 0;
   };
   const sorted = [...list.filter(g => !isInactive(g)), ...list.filter(g => isInactive(g))];
 
@@ -4568,36 +4488,6 @@ function renderGoals(filter) {
     const goalNum  = GOALS.indexOf(g) + 1;
     const prog     = S.goalProgress[g.id] !== undefined ? S.goalProgress[g.id] : (g.progress || 0);
     const dimmed   = isInactive(g);
-
-    // Qa milestone rows — all unlocked since we're past Qa
-    const milEntries = Object.entries(g.weekly || {}).filter(([,t]) => t && t !== '—');
-    const milestonesHTML = milEntries.length > 0 ? milEntries.map(([wkL, task], idx) => {
-      const milKey = `${g.id}-${wkL}`;
-      const isDone = S.milestonesDone[milKey];
-      const wkIdx  = WEEK_KEYS.indexOf(wkL);
-      const prevMilKey = idx > 0 ? `${g.id}-${milEntries[idx-1][0]}` : null;
-      const prevDone   = prevMilKey ? S.milestonesDone[prevMilKey] : true;
-      const weekArrived = wkIdx <= wk;
-      const isLocked    = !weekArrived && !prevDone;
-      const editId = `mil-edit-${milKey.replace(/\s/g,'-')}`;
-      return `<div class="milestone-row ${isLocked?'locked':''} ${isDone?'completed':''}">
-        <div class="milestone-check ${isLocked?'locked-icon':''} ${isDone?'done':''}"
-          onclick="${isLocked?'':`toggleMilestone('${milKey}','${g.id}')`}">${isLocked?'🔒':isDone?'✓':''}</div>
-        <div class="milestone-content">
-          <div class="milestone-week">${wkL}</div>
-          <div class="milestone-text" id="mtext-${editId}"
-            onclick="${isLocked?'':'openMilestoneEdit(\''+milKey+'\',\''+editId+'\')'}"
-            title="${isLocked?'':'Click to edit'}">${task}</div>
-          <div class="milestone-edit-wrap" id="medit-${editId}" style="display:none">
-            <input class="milestone-edit-input" id="minput-${editId}"
-              value="${task.replace(/"/g,'&quot;')}"
-              onkeydown="if(event.key==='Enter')saveMilestoneText('${milKey}','${editId}','${g.id}');if(event.key==='Escape')closeMilestoneEdit('${editId}')">
-            <button class="milestone-save-btn" onclick="saveMilestoneText('${milKey}','${editId}','${g.id}')">Save</button>
-            <button class="milestone-cancel-btn" onclick="closeMilestoneEdit('${editId}')">✕</button>
-          </div>
-        </div>
-      </div>`;
-    }).join('') : `<div style="padding:12px 20px;font-size:12px;color:var(--warm-muted)">${g.status==='paused'?'Paused':'No Qa milestones — set Qb targets via Edit'}</div>`;
 
     const qaP = prog;
     const qbP = 0;
@@ -4634,77 +4524,8 @@ function renderGoals(filter) {
           </div>
         </div>
       </div>
-      <div class="goal-card-bottom">
-        <button class="milestones-toggle" onclick="toggleMilestonesPanel(this)">
-          <span>📍 Qa milestones (${milEntries.length} weeks)</span>
-          <span class="toggle-arrow">▼</span>
-        </button>
-        <div class="milestones-body">
-          ${milestonesHTML}
-        </div>
-      </div>
     </div>`;
   }).join('');
-}
-
-function toggleMilestonesPanel(btn) {
-  const body = btn.nextElementSibling;
-  const arrow = btn.querySelector('.toggle-arrow');
-  body.classList.toggle('open');
-  arrow.classList.toggle('open');
-}
-
-function toggleMilestone(milKey, goalId) {
-  S.milestonesDone[milKey] = !S.milestonesDone[milKey];
-  saveState();
-  renderGoals(currentCatFilter);
-  if(S.milestonesDone[milKey]) toast('Milestone complete! ✨ Next one unlocked.');
-}
-
-function openMilestoneEdit(milKey, editId) {
-  // Hide the display text, show the input
-  const textEl = document.getElementById('mtext-' + editId);
-  const editEl = document.getElementById('medit-' + editId);
-  if (!textEl || !editEl) return;
-  textEl.style.display = 'none';
-  editEl.style.display  = 'flex';
-  const inp = document.getElementById('minput-' + editId);
-  if (inp) { inp.focus(); inp.select(); }
-}
-
-function closeMilestoneEdit(editId) {
-  const textEl = document.getElementById('mtext-' + editId);
-  const editEl = document.getElementById('medit-' + editId);
-  if (textEl) textEl.style.display = '';
-  if (editEl) editEl.style.display  = 'none';
-}
-
-function saveMilestoneText(milKey, editId, goalId) {
-  const inp = document.getElementById('minput-' + editId);
-  if (!inp) return;
-  const newText = inp.value.trim();
-  if (!newText) { inp.focus(); return; }
-
-  // milKey format: "{goalId}-{wkLabel}" e.g. "3-Mar Wk1"
-  const dashIdx = milKey.indexOf('-');
-  const wkLabel = milKey.slice(dashIdx + 1);
-
-  // Find and mutate the goal's weekly entry
-  const goal = GOALS.find(g => g.id === goalId);
-  if (goal && goal.weekly.hasOwnProperty(wkLabel)) {
-    goal.weekly[wkLabel] = newText;
-  }
-
-  // Also persist the override in state so it survives reload
-  if (!S.milestoneEdits) S.milestoneEdits = {};
-  S.milestoneEdits[milKey] = newText;
-  saveState();
-
-  closeMilestoneEdit(editId);
-  // Update just the text node without full re-render to preserve open accordion
-  const textEl = document.getElementById('mtext-' + editId);
-  if (textEl) textEl.textContent = newText;
-  toast('Milestone updated ✓');
 }
 
 function filterGoals(f, btn) {
