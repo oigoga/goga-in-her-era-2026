@@ -2957,6 +2957,7 @@ const SUPABASE_URL = 'https://pqzkebhrxkvswzgavmke.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_e8yxX4S_ojUnhwaWy8Q7AA_pFfWP1op';
 
 let syncTimer = null;
+let syncDirty = false; // true when local has changes not yet pushed to Supabase
 
 async function cloudGet(key) {
   try {
@@ -3015,16 +3016,43 @@ async function syncDown() {
   showSyncStatus('synced');
 }
 
-// Debounced sync — waits 1.5s after last change then pushes
+// Debounced sync — saves to localStorage immediately, pushes to Supabase after 800ms idle
 function saveState() {
   saveLocal();
+  syncDirty = true;
   showSyncStatus('saving');
   clearTimeout(syncTimer);
   syncTimer = setTimeout(async () => {
+    syncTimer = null;
     const ok = await cloudSet('goga2026_state', S);
-    showSyncStatus(ok ? 'synced' : 'offline');
-  }, 1500);
+    if (ok) { syncDirty = false; showSyncStatus('synced'); }
+    else {
+      showSyncStatus('offline');
+      // Retry once after 3s on failure
+      setTimeout(async () => {
+        const retry = await cloudSet('goga2026_state', S);
+        if (retry) { syncDirty = false; showSyncStatus('synced'); }
+      }, 3000);
+    }
+  }, 800);
 }
+
+// Flush immediately when tab is hidden (user switches away or closes tab)
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden && syncDirty) {
+    clearTimeout(syncTimer);
+    syncTimer = null;
+    cloudSet('goga2026_state', S).then(ok => {
+      if (ok) { syncDirty = false; showSyncStatus('synced'); }
+    });
+  }
+});
+
+// Final safety net: ensure localStorage is always current on close
+window.addEventListener('beforeunload', () => {
+  saveLocal();
+  if (syncDirty) cloudSet('goga2026_state', S);
+});
 
 function saveLocal() {
   try { localStorage.setItem('goga2026v2', JSON.stringify(S)); } catch {}
