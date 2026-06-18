@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- Navy rounded square background -->
+  <rect width="100" height="100" rx="20" fill="#1B3559"/>
+  <!-- Honeycomb italic serif G -->
+  <text x="52" y="74"
+    font-family="Georgia,'Times New Roman',serif"
+    font-size="70"
+    font-weight="600"
+    font-style="italic"
+    text-anchor="middle"
+    fill="#E8B775">G</text>
+</svg>
