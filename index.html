@@ -2989,7 +2989,21 @@ async function syncDown() {
   showSyncStatus('syncing');
   const remote = await cloudGet('goga2026_state');
   if (remote) {
-    S = { ...S, ...remote };
+    // Merge remote into local — but never overwrite a non-empty local value
+    // with an empty remote one (prevents a stale/reset remote from wiping local data).
+    const merged = { ...S };
+    for (const [k, rv] of Object.entries(remote)) {
+      const lv = S[k];
+      const remoteEmpty = rv === null || rv === undefined ||
+        (Array.isArray(rv) && rv.length === 0) ||
+        (rv && typeof rv === 'object' && !Array.isArray(rv) && Object.keys(rv).length === 0);
+      const localHasData = lv !== null && lv !== undefined &&
+        (Array.isArray(lv) ? lv.length > 0 : (typeof lv === 'object' ? Object.keys(lv).length > 0 : true));
+      // Remote wins unless it's empty and local has data
+      if (remoteEmpty && localHasData) continue;
+      merged[k] = rv;
+    }
+    S = merged;
     // Refresh aliases so UI reads from the merged remote data
     if (S.goals)           GOALS               = S.goals;
     if (S.catColors)       CAT_COLORS          = S.catColors;
