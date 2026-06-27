@@ -2322,6 +2322,64 @@ input[type=range] {
   .fin-setting-label { min-width: 0; width: 100%; }
   .fin-setting-input { width: 100%; box-sizing: border-box; }
 }
+
+/* ── GOOGLE CALENDAR VIEW ── */
+.gcal-setup-card {
+  background:var(--surface); border-radius:18px; padding:28px 28px 24px;
+  border:1.5px solid var(--line); max-width:560px; margin:24px auto;
+}
+.gcal-setup-title {
+  font-family:var(--font-display); font-size:22px; font-weight:600;
+  color:var(--headline); margin-bottom:6px;
+}
+.gcal-setup-sub { font-size:13px; color:var(--text-soft); margin-bottom:20px; line-height:1.6; }
+.gcal-steps { list-style:none; padding:0; margin:0 0 20px; counter-reset:step; }
+.gcal-steps li {
+  counter-increment:step; padding:8px 0 8px 36px; position:relative;
+  font-size:13px; color:var(--text); border-bottom:1px solid var(--line);
+}
+.gcal-steps li:last-child { border-bottom:none; }
+.gcal-steps li::before {
+  content:counter(step); position:absolute; left:0; top:8px;
+  width:22px; height:22px; border-radius:50%; background:var(--accent);
+  color:var(--accent-text); font-size:11px; font-weight:700;
+  display:flex; align-items:center; justify-content:center;
+}
+.gcal-url-input {
+  width:100%; padding:10px 14px; border:1.5px solid var(--line);
+  border-radius:10px; font-family:var(--font-body); font-size:12px;
+  color:var(--text); background:var(--surface-2); outline:none;
+  box-sizing:border-box; margin-bottom:10px;
+}
+.gcal-url-input:focus { border-color:var(--accent); }
+.gcal-save-btn {
+  padding:10px 24px; background:var(--accent); color:var(--accent-text);
+  border:none; border-radius:10px; font-family:var(--font-body);
+  font-weight:700; font-size:13px; cursor:pointer;
+}
+.gcal-save-btn:hover { opacity:0.88; }
+.gcal-iframe-wrap {
+  border-radius:16px; overflow:hidden; border:1.5px solid var(--line);
+  background:var(--surface); margin-top:4px;
+}
+.gcal-iframe-wrap iframe { display:block; width:100%; height:680px; border:none; }
+.gcal-topbar {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:12px 20px; border-bottom:1px solid var(--line);
+}
+.gcal-topbar-title { font-weight:700; font-size:13px; color:var(--text); }
+.gcal-change-btn {
+  font-size:11px; color:var(--text-soft); background:none; border:none;
+  cursor:pointer; font-family:var(--font-body); text-decoration:underline;
+}
+.gcal-btn {
+  display:inline-flex; align-items:center; gap:4px;
+  font-size:10px; font-weight:700; font-family:var(--font-body);
+  padding:3px 7px; border-radius:6px; border:1.5px solid var(--accent);
+  background:transparent; color:var(--accent); cursor:pointer;
+  white-space:nowrap; text-decoration:none; margin-left:4px;
+}
+.gcal-btn:hover { background:var(--accent); color:var(--accent-text); }
 </style>
 <link rel="apple-touch-icon" sizes="192x192" id="ati-icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAMAAAADACAYAAABS3GwHAAADG0lEQVR42u3c0Y3iWhRFQedBHARDIMRGSmRhRAQgIyTfs6ql9f843tVMz7xm207ydbnednXaal8eunJAPEglMXhoykHwgJTF4IEoicBDUBaCwyuLwMGVRODIykJwWGUROKjSCBxTWQAOqSwCB1QWgcMpjcDRlAXgYMoicCilETiSAJCKABxIaQSOoywAh1EagaMIAKkIwEGURuAYAkACQAJAAkACQAJAGgzAIZRG4AgCQAJAAkACQAJAAkACQAJAAkACQAJAAkACQB97Pu6Hcz8AMmOHAgCjhwEAo4cBAMMHAQDDBwEAwwcBAMMHAQDjhwAAwwcBAOOHAADjhwAAwwcBAOOHAADjhwAA44cAAOOHAAAAAADA+CEAwJghyAJYbVQQADAKgNcAQG78XhMAyfF7fQAkAXidABi/zyICoAag8Jr9NajxLzUK4wcg/0cBw48CMP7fbuH3AQAYNQ7DDwHw3f/YTfxOMACjR2L4AOR/IDT84QCMXwAAIACMXzEAvvsLAOMXAAAIAAAEgPErAeBM3/19dAoAAAAAAAAAAAAAAAC0fgAGAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA8O8AAAAAAAAAAAAAAAAAAMCgH4QBACD9LgAAAAAAAIDfCRYAPhdIAHgXEADeBQQAAAIAAgGwHgAIAMgDgAAA7wLGAoB3AYMBAAIB0AUAAQAQgAAAABAAAAEEAAAAAgAQgAAABP/BABUAo35Z/ch/r7ECkP7EBmMFAAKDBaCMwGABAEAAQCAAogiMFoA0AqMFAALDBaAMwTMDII3A8wIgjcCzAiAPwXMCII3AMwIgDcGzAcD/Vu25AFCG4HkAkIbgOQCQx+D+APhkOgEwFYX7ASABIAEgASABIAEgASABIAEgASABIH0L4P3lEMqOHwAB4BgCQAJAAkACQAJACgCAQOnxAyAAHEVlABAoPX4AlAcAgdLjB0AAOJLKACBQevwQKD9+AJQHAIHS44dA+fFDoPz4AVAeAARKjx8C5ccPgvLDh0DGD4GMHwQZPgQyfhhk9CDI8GGQ0QOipQb+Aismc+YZOzhjAAAAAElFTkSuQmCC">
 <link rel="icon" type="image/svg+xml" id="favicon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj4KICA8cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgcng9IjIwIiBmaWxsPSIjMUIzNTU5Ii8+CiAgPHRleHQgeD0iNTIiIHk9Ijc0IgogICAgZm9udC1mYW1pbHk9Ikdlb3JnaWEsJ1RpbWVzIE5ldyBSb21hbicsc2VyaWYiCiAgICBmb250LXNpemU9IjcwIgogICAgZm9udC13ZWlnaHQ9IjYwMCIKICAgIGZvbnQtc3R5bGU9Iml0YWxpYyIKICAgIHRleHQtYW5jaG9yPSJtaWRkbGUiCiAgICBmaWxsPSIjRThCNzc1Ij5HPC90ZXh0Pgo8L3N2Zz4K">
@@ -2370,6 +2428,10 @@ input[type=range] {
       <span class="mbn-icon">💰</span>
       <span class="mbn-label">Finances</span>
     </div>
+    <div class="mobile-bottom-nav-item" id="mbn-calendar" onclick="showView('calendar',null);updateMobileNav('calendar')">
+      <span class="mbn-icon">📆</span>
+      <span class="mbn-label">Calendar</span>
+    </div>
   </div>
 </nav>
 
@@ -2404,6 +2466,9 @@ input[type=range] {
     </div>
     <div class="nav-item" data-view="finance" onclick="showView('finance',this);updateMobileNav('finance');closeSidebar()">
       <span class="nav-icon">💰</span><span>Finances</span>
+    </div>
+    <div class="nav-item" data-view="calendar" onclick="showView('calendar',this);updateMobileNav('calendar');closeSidebar()">
+      <span class="nav-icon">📆</span><span>Calendar</span>
     </div>
   </nav>
   <div class="sidebar-bottom">
@@ -2645,6 +2710,15 @@ input[type=range] {
   <div id="fin-panel-goals" class="fin-panel"></div>
   <div id="fin-panel-debts" class="fin-panel"></div>
   <div id="fin-panel-settings" class="fin-panel"></div>
+</div>
+
+<!-- ══════ CALENDAR ══════ -->
+<div id="view-calendar" class="view">
+  <div class="page-header">
+    <div class="page-title">Your <em>Calendar</em></div>
+    <div class="page-sub">See your Google Calendar here and add tasks directly from the week plan.</div>
+  </div>
+  <div id="gcal-view-body"></div>
 </div>
 
 <!-- FINANCE ADD/EDIT MODAL -->
@@ -3181,6 +3255,7 @@ if (!S.monthOpenData) S.monthOpenData = {};
 if (!S.monthResetDone) S.monthResetDone = {};
 if (!S.monthPlan) S.monthPlan = {};
 if (!S.monthReview) S.monthReview = {};
+if (!S.googleCalendarEmbedUrl) S.googleCalendarEmbedUrl = '';
 
 // habit view modes
 const habitViewMode = { daily:'weekly', weekly:'weekly' };
@@ -3500,14 +3575,15 @@ function statusPill(g) {
 // NAV
 // ═══════════════════════════════════════════════════
 const VIEW_LABELS = {
-  home:    'Home',
-  week:    "This Week's Plan",
-  monthly: 'Monthly',
-  planner: 'Planner',
-  goals:   'Goals',
-  habits:  'Habits',
-  finance: 'Finances',
-  quarter: 'Qa Overview',
+  home:     'Home',
+  week:     "This Week's Plan",
+  monthly:  'Monthly',
+  planner:  'Planner',
+  goals:    'Goals',
+  habits:   'Habits',
+  finance:  'Finances',
+  quarter:  'Qa Overview',
+  calendar: 'Calendar',
 };
 
 function showView(id, el) {
@@ -3531,6 +3607,7 @@ function showView(id, el) {
   if (id==='quarter') renderQuarter();
   if (id==='finance') renderFinance();
   if (id==='monthly') renderMonthlyClose();
+  if (id==='calendar') renderCalendar();
   updateDynamicLabels();
 }
 
@@ -3980,7 +4057,8 @@ function wpCardHTML(task, inColumn) {
                 onclick="event.stopPropagation()">
               <option value=""${!task.assignedDay?' selected':''}>Pool</option>
               ${dayOpts}
-            </select>`
+            </select>
+            ${task.assignedDay ? (() => { const u = gcalAddUrl(task); return u ? `<a class="gcal-btn" href="${u}" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="Add to Google Calendar">📆</a>` : ''; })() : ''}`
         }
       </div>
     </div>
@@ -6541,6 +6619,89 @@ function saveFinSettings() {
   saveState();
   renderFinDashboard();
   toast('Settings saved ✓');
+}
+
+// ═══════════════════════════════════════════════════
+// GOOGLE CALENDAR INTEGRATION
+// ═══════════════════════════════════════════════════
+
+function gcalAddUrl(task) {
+  if (!task.assignedDay || !task.weekKey) return null;
+  const monthKey = task.weekKey.replace(/-w\d+$/, '');
+  const weeks = getWeeksForMonth(monthKey);
+  const week = weeks.find(w => w.key === task.weekKey);
+  if (!week) return null;
+  const DAY_OFFSET = { Sun:0, Mon:1, Tue:2, Wed:3, Thu:4, Fri:5, Sat:6 };
+  const offset = DAY_OFFSET[task.assignedDay] ?? 1;
+  const eventDate = new Date(week.start);
+  eventDate.setDate(eventDate.getDate() + offset);
+  let startH = 9, startM = 0;
+  if (task.proposedTime) {
+    const [h, m] = task.proposedTime.split(':').map(Number);
+    startH = h || 9; startM = m || 0;
+  }
+  const start = new Date(eventDate);
+  start.setHours(startH, startM, 0, 0);
+  const end = new Date(start);
+  end.setHours(startH + 1, startM, 0, 0);
+  const pad = n => String(n).padStart(2, '0');
+  const fmt = d => `${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}T${pad(d.getHours())}${pad(d.getMinutes())}00`;
+  const goal = task.goalId ? GOALS.find(g => String(g.id) === String(task.goalId)) : null;
+  const details = goal ? `Goal: ${goal.name}` : (task.category || '');
+  return `https://calendar.google.com/calendar/render?action=TEMPLATE` +
+    `&text=${encodeURIComponent(task.text || 'Task')}` +
+    `&dates=${fmt(start)}/${fmt(end)}` +
+    `&details=${encodeURIComponent(details)}`;
+}
+
+function renderCalendar() {
+  const body = document.getElementById('gcal-view-body');
+  if (!body) return;
+  const url = S.googleCalendarEmbedUrl;
+  if (!url) {
+    body.innerHTML = `
+      <div class="gcal-setup-card">
+        <div class="gcal-setup-title">Connect your Google Calendar</div>
+        <div class="gcal-setup-sub">Paste your Google Calendar embed URL below to see your calendar right here — your events and your planner, side by side.</div>
+        <ol class="gcal-steps">
+          <li>Open <strong>calendar.google.com</strong> in a new tab</li>
+          <li>Click the ⚙ gear icon → <strong>Settings</strong></li>
+          <li>In the left sidebar click your calendar name under <em>My calendars</em></li>
+          <li>Scroll to <strong>Integrate calendar</strong></li>
+          <li>Copy the URL inside the <em>Embed code</em> — it starts with<br>
+            <code style="font-size:11px;background:var(--surface-2);padding:2px 6px;border-radius:4px;word-break:break-all">https://calendar.google.com/calendar/embed?src=…</code></li>
+          <li>Paste it below and click <strong>Save</strong></li>
+        </ol>
+        <input class="gcal-url-input" id="gcal-url-input" type="url"
+          placeholder="https://calendar.google.com/calendar/embed?src=…">
+        <button class="gcal-save-btn" onclick="saveCalendarUrl()">Save &amp; Show Calendar</button>
+      </div>`;
+    return;
+  }
+  body.innerHTML = `
+    <div class="gcal-topbar">
+      <div class="gcal-topbar-title">📆 Google Calendar</div>
+      <button class="gcal-change-btn" onclick="changeCalendarUrl()">Change URL</button>
+    </div>
+    <div class="gcal-iframe-wrap">
+      <iframe src="${url}" frameborder="0" scrolling="no" allowfullscreen title="Google Calendar"></iframe>
+    </div>`;
+}
+
+function saveCalendarUrl() {
+  const inp = document.getElementById('gcal-url-input');
+  const val = (inp ? inp.value : '').trim();
+  if (!val || !val.startsWith('https://calendar.google.com/')) {
+    toast('Paste a valid Google Calendar embed URL'); return;
+  }
+  S.googleCalendarEmbedUrl = val;
+  saveState(); renderCalendar();
+  toast('Calendar connected ✓');
+}
+
+function changeCalendarUrl() {
+  S.googleCalendarEmbedUrl = '';
+  saveState(); renderCalendar();
 }
 
 // ═══════════════════════════════════════════════════
