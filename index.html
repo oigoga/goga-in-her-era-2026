@@ -529,6 +529,19 @@ body {
 .task-item.done { opacity:0.45; }
 .task-item.done .task-item-text { text-decoration:line-through; }
 
+/* Home task card — wraps task-item row + details panel */
+.home-task-card {
+  margin-bottom:8px; border-radius:12px;
+  border:1px solid var(--blush); overflow:hidden;
+  background:var(--linen); transition:border-color 0.2s;
+}
+.home-task-card:hover { border-color:var(--rose); }
+.home-task-card .task-item {
+  margin-bottom:0; border:none; border-radius:0;
+  background:transparent;
+}
+.home-task-card .task-item:hover { background:var(--parchment); }
+
 .task-check {
   width:22px; height:22px; border-radius:50%;
   border:2px solid var(--blush-deep);
@@ -3811,19 +3824,36 @@ function renderHome() {
   const homeTodayTasks = allWkTasksHome.filter(t => t.assignedDay === todayDayName2);
 
   function homeTodayTaskHTML(t, isBacklog) {
-    const cat = t.category || 'DEFAULT';
-    const col = CAT_COLORS[cat] || CAT_COLORS.DEFAULT;
+    const cat  = t.category || 'DEFAULT';
+    const col  = CAT_COLORS[cat] || CAT_COLORS.DEFAULT;
     const goal = t.goalId ? GOALS.find(g => String(g.id) === String(t.goalId)) : null;
-    return `<div class="task-item ${t.completed ? 'done' : ''}"
-        style="${isBacklog && !t.completed ? 'border-left:3px solid #e88080;background:#fff8f8;' : ''}">
-      <input type="checkbox" class="wp-check" ${t.completed ? 'checked' : ''}
-        onclick="homeTodayToggle('${t.id}')">
-      <span class="cat-dot" style="background:${col.border}"></span>
-      <div style="flex:1;min-width:0">
-        <div class="task-item-text${t.completed ? ' completed' : ''}">${t.text}</div>
-        ${goal ? `<div class="task-item-meta">${goal.name}</div>` : ''}
+    const subs = t.subtasks || [];
+    const subsDone = subs.filter(s => s.done).length;
+    const subsPct  = subs.length ? Math.round(subsDone / subs.length * 100) : 0;
+    const detailLabel = subs.length
+      ? `<span class="wp-details-arrow" id="h-wp-darr-${t.id}">▾</span> ${subsDone}/${subs.length} subtasks`
+      : `<span class="wp-details-arrow" id="h-wp-darr-${t.id}">▾</span> Details`;
+    const backlogStyle = isBacklog && !t.completed ? 'border-left:3px solid #e88080;' : '';
+
+    return `<div class="home-task-card">
+      <div class="task-item ${t.completed ? 'done' : ''}" style="${backlogStyle}background:transparent">
+        <input type="checkbox" class="wp-check" ${t.completed ? 'checked' : ''}
+          onclick="homeTodayToggle('${t.id}')">
+        <span class="cat-dot" style="background:${col.border}"></span>
+        <div style="flex:1;min-width:0">
+          <div class="task-item-text${t.completed ? ' completed' : ''}">${t.text}</div>
+          ${goal ? `<div class="task-item-meta">🎯 ${goal.name}</div>` : ''}
+        </div>
+        ${isBacklog ? '<span class="backlog-badge" style="flex-shrink:0">Backlog</span>' : ''}
       </div>
-      ${isBacklog ? '<span class="backlog-badge" style="flex-shrink:0">Backlog</span>' : ''}
+      ${subs.length ? `<div class="wp-card-subprog" style="margin:0;border-radius:0"><div class="wp-card-subprog-fill" id="h-wp-spfill-${t.id}" style="width:${subsPct}%"></div></div>` : ''}
+      <button class="wp-details-toggle"
+        onclick="wpToggleDetails('${t.id}','h-wp-')">${detailLabel}</button>
+      <div class="wp-details-panel" id="h-wp-details-${t.id}">
+        <div class="wp-details-inner" id="h-wp-details-inner-${t.id}">
+          ${wpDetailsInnerHTML(t)}
+        </div>
+      </div>
     </div>`;
   }
 
@@ -3852,6 +3882,7 @@ function renderHome() {
   </div>`;
 
   plateEl.innerHTML = plateHTML;
+  _restoreExpandedCards();
   renderSundayRefresh('home-sunday-refresh');
   updateDynamicLabels();
 }
@@ -4182,7 +4213,7 @@ function wpCardHTML(task, inColumn) {
       </div>
       ${subs.length ? `<div class="wp-card-subprog"><div class="wp-card-subprog-fill" id="wp-spfill-${task.id}" style="width:${subsPct}%"></div></div>` : ''}
       <button class="wp-details-toggle"
-        onclick="event.stopPropagation();wpToggleDetails('${task.id}')">${detailLabel}</button>
+        onclick="event.stopPropagation();wpToggleDetails('${task.id}','wp-')">${detailLabel}</button>
       <div class="wp-details-panel" id="wp-details-${task.id}"
            ondragstart="event.stopPropagation()">
         <div class="wp-details-inner" id="wp-details-inner-${task.id}">
@@ -4218,9 +4249,11 @@ function wpDragLeave(e) {
 }
 
 // ── Task details / subtasks ──
-function wpToggleDetails(taskId) {
-  const panel = document.getElementById('wp-details-' + taskId);
-  const arrow = document.getElementById('wp-darr-' + taskId);
+// prefix is 'wp-' (week board) or 'h-wp-' (home page)
+function wpToggleDetails(taskId, prefix) {
+  prefix = prefix || 'wp-';
+  const panel = document.getElementById(prefix + 'details-' + taskId);
+  const arrow = document.getElementById(prefix + 'darr-' + taskId);
   if (!panel) return;
   const open = panel.classList.toggle('open');
   if (open) { _wpExpandedTasks.add(taskId); if (arrow) arrow.style.transform = 'rotate(180deg)'; }
@@ -4233,31 +4266,39 @@ function _refreshTaskDetails(taskId) {
   const subs = task.subtasks || [];
   const done = subs.filter(s => s.done).length;
   const pct  = subs.length ? Math.round(done / subs.length * 100) : 0;
-  // Update the mini progress strip on the card
-  const fill = document.getElementById('wp-spfill-' + taskId);
-  if (fill) fill.style.width = pct + '%';
-  // Update the detail panel label (subtask count)
-  const toggle = document.querySelector(`[onclick*="wpToggleDetails('${taskId}')"]`);
-  if (toggle && subs.length) {
-    const arrow = toggle.querySelector('.wp-details-arrow');
-    toggle.innerHTML = '';
-    if (arrow) toggle.appendChild(arrow);
-    toggle.append(` ${done}/${subs.length} subtasks`);
-  }
-  // Re-render the panel inner content (preserves open/close state)
-  const inner = document.getElementById('wp-details-inner-' + taskId);
-  if (inner) inner.innerHTML = wpDetailsInnerHTML(task);
-  // Ensure a missing strip is added when first subtask is created
+
+  // Update progress fills in both week board and home page
+  ['wp-spfill-', 'h-wp-spfill-'].forEach(p => {
+    const fill = document.getElementById(p + taskId);
+    if (fill) fill.style.width = pct + '%';
+  });
+
+  // Re-render details inner content in both panels
+  ['wp-details-inner-', 'h-wp-details-inner-'].forEach(p => {
+    const inner = document.getElementById(p + taskId);
+    if (inner) inner.innerHTML = wpDetailsInnerHTML(task);
+  });
+
+  // Update toggle button label in both panels
+  ['wp-', 'h-wp-'].forEach(prefix => {
+    const arrow = document.getElementById(prefix + 'darr-' + taskId);
+    if (!arrow) return;
+    const toggle = arrow.closest('.wp-details-toggle');
+    if (!toggle) return;
+    const isOpen = arrow.style.transform === 'rotate(180deg)';
+    toggle.innerHTML = subs.length
+      ? `<span class="wp-details-arrow" id="${prefix}darr-${taskId}" style="transform:${isOpen?'rotate(180deg)':''}">▾</span> ${done}/${subs.length} subtasks`
+      : `<span class="wp-details-arrow" id="${prefix}darr-${taskId}" style="transform:${isOpen?'rotate(180deg)':''}">▾</span> Details`;
+  });
+
+  // Add missing progress strip to week card when first subtask is created
   const body = document.querySelector(`.pool-card[data-id="${taskId}"] .pool-card-body`);
-  if (body && subs.length) {
-    let strip = document.getElementById('wp-spfill-' + taskId);
-    if (!strip) {
-      const prog = document.createElement('div');
-      prog.className = 'wp-card-subprog';
-      prog.innerHTML = `<div class="wp-card-subprog-fill" id="wp-spfill-${taskId}" style="width:${pct}%"></div>`;
-      const toggle2 = body.querySelector('.wp-details-toggle');
-      if (toggle2) body.insertBefore(prog, toggle2);
-    }
+  if (body && subs.length && !document.getElementById('wp-spfill-' + taskId)) {
+    const prog = document.createElement('div');
+    prog.className = 'wp-card-subprog';
+    prog.innerHTML = `<div class="wp-card-subprog-fill" id="wp-spfill-${taskId}" style="width:${pct}%"></div>`;
+    const toggle = body.querySelector('.wp-details-toggle');
+    if (toggle) body.insertBefore(prog, toggle);
   }
 }
 
@@ -4300,10 +4341,17 @@ function wpSaveNotes(taskId, text) {
 
 function _restoreExpandedCards() {
   _wpExpandedTasks.forEach(id => {
-    const panel = document.getElementById('wp-details-' + id);
-    const arrow = document.getElementById('wp-darr-' + id);
-    if (panel) { panel.classList.add('open'); if (arrow) arrow.style.transform = 'rotate(180deg)'; }
-    else _wpExpandedTasks.delete(id); // card no longer in DOM
+    let found = false;
+    ['wp-', 'h-wp-'].forEach(prefix => {
+      const panel = document.getElementById(prefix + 'details-' + id);
+      const arrow = document.getElementById(prefix + 'darr-' + id);
+      if (panel) {
+        found = true;
+        panel.classList.add('open');
+        if (arrow) arrow.style.transform = 'rotate(180deg)';
+      }
+    });
+    if (!found) _wpExpandedTasks.delete(id); // task no longer in any view
   });
 }
 
