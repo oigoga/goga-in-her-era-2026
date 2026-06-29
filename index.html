@@ -702,6 +702,75 @@ body {
   font-family: 'Poppins', sans-serif;
 }
 .wp-promote-btn:hover { background: var(--sage); color: #fff; }
+
+/* ── TASK DETAILS / SUBTASKS ── */
+.wp-details-toggle {
+  width:100%; background:none; border:none; border-top:1px solid var(--blush);
+  color:var(--warm-muted); font-size:10px; font-family:var(--font-body);
+  font-weight:700; padding:5px 9px; cursor:pointer; text-align:left;
+  display:flex; align-items:center; gap:5px; letter-spacing:0.3px;
+  transition:background 0.15s,color 0.15s;
+}
+.wp-details-toggle:hover { background:var(--linen); color:var(--warm-dark); }
+.wp-details-arrow { font-size:8px; transition:transform 0.2s; display:inline-block; }
+.wp-details-panel {
+  max-height:0; overflow:hidden;
+  transition:max-height 0.32s ease;
+}
+.wp-details-panel.open { max-height:900px; }
+.wp-details-inner {
+  padding:10px 9px 11px; border-top:1px solid var(--blush);
+  user-select:text; -webkit-user-select:text;
+}
+.wp-sub-prog-wrap { display:flex; align-items:center; gap:7px; margin-bottom:9px; }
+.wp-sub-prog-bar {
+  flex:1; height:5px; background:var(--parchment);
+  border-radius:3px; overflow:hidden;
+}
+.wp-sub-prog-fill {
+  height:100%; background:var(--sage); border-radius:3px; transition:width 0.3s;
+}
+.wp-sub-prog-label { font-size:10px; font-weight:700; color:var(--warm-muted); white-space:nowrap; }
+.wp-subtask-row {
+  display:flex; align-items:center; gap:5px;
+  padding:4px 2px; border-bottom:1px solid var(--parchment);
+}
+.wp-subtask-row:last-child { border-bottom:none; }
+.wp-subtask-lbl { flex:1; display:flex; align-items:center; gap:6px; cursor:pointer; }
+.wp-subtask-lbl input[type=checkbox] { width:13px; height:13px; accent-color:var(--sage); flex-shrink:0; }
+.wp-subtask-txt { font-size:11px; color:var(--warm-dark); line-height:1.4; word-break:break-word; }
+.wp-subtask-txt.done { text-decoration:line-through; opacity:0.45; }
+.wp-subtask-del {
+  background:none; border:none; color:var(--warm-muted); font-size:9px;
+  cursor:pointer; padding:2px 5px; border-radius:4px;
+  opacity:0; transition:opacity 0.15s;
+}
+.wp-subtask-row:hover .wp-subtask-del { opacity:1; }
+.wp-add-sub-row { display:flex; gap:5px; margin-top:8px; }
+.wp-add-sub-inp {
+  flex:1; padding:5px 8px; border:1.5px solid var(--blush-deep);
+  border-radius:7px; font-size:11px; font-family:var(--font-body);
+  background:var(--linen); color:var(--warm-dark); outline:none;
+}
+.wp-add-sub-inp:focus { border-color:var(--rose); }
+.wp-add-sub-btn {
+  padding:5px 10px; background:var(--sage); color:#fff;
+  border:none; border-radius:7px; font-size:10px; font-weight:700;
+  cursor:pointer; flex-shrink:0; font-family:var(--font-body);
+}
+.wp-task-notes {
+  width:100%; margin-top:9px; padding:7px 9px;
+  border:1.5px solid var(--blush-deep); border-radius:8px;
+  font-size:11px; font-family:var(--font-body); color:var(--warm-dark);
+  background:var(--linen); resize:vertical; min-height:52px;
+  outline:none; box-sizing:border-box; display:block;
+}
+.wp-task-notes:focus { border-color:var(--rose); }
+.wp-card-subprog {
+  height:3px; background:var(--parchment); border-radius:0 0 3px 3px;
+  overflow:hidden; margin:4px -9px -2px;
+}
+.wp-card-subprog-fill { height:100%; background:var(--sage); border-radius:3px; transition:width 0.3s; }
 .wp-day-sel {
   font-size: 9px; font-weight: 700;
   border: 1px solid var(--blush-deep); border-radius: 6px;
@@ -3405,6 +3474,8 @@ function addWeeklyTask(task) {
     planned:      task.planned       ?? false,
     completed:    task.completed     ?? false,
     isBacklog:    task.isBacklog     ?? false,
+    subtasks:     task.subtasks      || [],
+    notes:        task.notes         || '',
     createdAt:    task.createdAt     || Date.now(),
   };
   S.weeklyTasks.push(t);
@@ -3870,6 +3941,7 @@ function calcStreak() {
 let _wpDragId = null;
 let _wpActiveDay = null; // tracks which day tab is active on mobile
 const WP_DAYS = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+const _wpExpandedTasks = new Set(); // tracks which task detail panels are open
 
 // Switch the visible day column on mobile
 function wpSetMobileDay(day) {
@@ -4018,15 +4090,62 @@ function renderWeek() {
       }).join('')}
     </div>`;
   }
+
+  // Restore any expanded detail panels after re-render
+  _restoreExpandedCards();
 }
 
 // Build HTML for one task card. inColumn=true adds the checkbox.
+function wpDetailsInnerHTML(task) {
+  const subs = task.subtasks || [];
+  const done = subs.filter(s => s.done).length;
+  const pct  = subs.length ? Math.round(done / subs.length * 100) : 0;
+  return `
+    ${subs.length ? `
+      <div class="wp-sub-prog-wrap">
+        <div class="wp-sub-prog-bar"><div class="wp-sub-prog-fill" style="width:${pct}%"></div></div>
+        <span class="wp-sub-prog-label">${done} of ${subs.length} done</span>
+      </div>` : ''}
+    <div id="wp-subs-list-${task.id}">
+      ${subs.map(s => `
+        <div class="wp-subtask-row">
+          <label class="wp-subtask-lbl" onclick="event.stopPropagation()">
+            <input type="checkbox" ${s.done?'checked':''}
+              onchange="wpToggleSubtask('${task.id}','${s.id}')"
+              onclick="event.stopPropagation()">
+            <span class="wp-subtask-txt${s.done?' done':''}">${s.text}</span>
+          </label>
+          <button class="wp-subtask-del"
+            onclick="event.stopPropagation();wpDeleteSubtask('${task.id}','${s.id}')"
+            title="Remove">✕</button>
+        </div>`).join('')}
+    </div>
+    <div class="wp-add-sub-row">
+      <input class="wp-add-sub-inp" id="wp-sub-inp-${task.id}"
+        placeholder="Add subtask…"
+        onclick="event.stopPropagation()"
+        onkeydown="if(event.key==='Enter'){event.stopPropagation();wpAddSubtask('${task.id}')}">
+      <button class="wp-add-sub-btn"
+        onclick="event.stopPropagation();wpAddSubtask('${task.id}')">Add</button>
+    </div>
+    <textarea class="wp-task-notes" placeholder="Notes…"
+      onclick="event.stopPropagation()"
+      ondragstart="event.stopPropagation()"
+      onblur="wpSaveNotes('${task.id}',this.value)">${task.notes || ''}</textarea>`;
+}
+
 function wpCardHTML(task, inColumn) {
   const cat  = task.category || 'DEFAULT';
   const col  = CAT_COLORS[cat] || CAT_COLORS.DEFAULT;
   const goal = task.goalId ? GOALS.find(g => String(g.id) === String(task.goalId)) : null;
   const dayOpts = WP_DAYS.map(d =>
     `<option value="${d}"${task.assignedDay===d?' selected':''}>${d}</option>`).join('');
+  const subs = task.subtasks || [];
+  const subsDone = subs.filter(s => s.done).length;
+  const subsPct  = subs.length ? Math.round(subsDone / subs.length * 100) : 0;
+  const detailLabel = subs.length
+    ? `<span class="wp-details-arrow" id="wp-darr-${task.id}">▾</span> ${subsDone}/${subs.length} subtasks`
+    : `<span class="wp-details-arrow" id="wp-darr-${task.id}">▾</span> Details`;
 
   return `<div class="pool-card" draggable="true" data-id="${task.id}"
       ondragstart="wpDragStart(event,'${task.id}')"
@@ -4061,6 +4180,15 @@ function wpCardHTML(task, inColumn) {
             ${task.assignedDay ? (() => { const u = gcalAddUrl(task); return u ? `<a class="gcal-btn" href="${u}" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="Add to Google Calendar">📆</a>` : ''; })() : ''}`
         }
       </div>
+      ${subs.length ? `<div class="wp-card-subprog"><div class="wp-card-subprog-fill" id="wp-spfill-${task.id}" style="width:${subsPct}%"></div></div>` : ''}
+      <button class="wp-details-toggle"
+        onclick="event.stopPropagation();wpToggleDetails('${task.id}')">${detailLabel}</button>
+      <div class="wp-details-panel" id="wp-details-${task.id}"
+           ondragstart="event.stopPropagation()">
+        <div class="wp-details-inner" id="wp-details-inner-${task.id}">
+          ${wpDetailsInnerHTML(task)}
+        </div>
+      </div>
     </div>
   </div>`;
 }
@@ -4087,6 +4215,96 @@ function wpDragLeave(e) {
   if (!e.currentTarget.contains(e.relatedTarget)) {
     e.currentTarget.classList.remove('drag-over');
   }
+}
+
+// ── Task details / subtasks ──
+function wpToggleDetails(taskId) {
+  const panel = document.getElementById('wp-details-' + taskId);
+  const arrow = document.getElementById('wp-darr-' + taskId);
+  if (!panel) return;
+  const open = panel.classList.toggle('open');
+  if (open) { _wpExpandedTasks.add(taskId); if (arrow) arrow.style.transform = 'rotate(180deg)'; }
+  else       { _wpExpandedTasks.delete(taskId); if (arrow) arrow.style.transform = ''; }
+}
+
+function _refreshTaskDetails(taskId) {
+  const task = (S.weeklyTasks || []).find(t => t.id === taskId);
+  if (!task) return;
+  const subs = task.subtasks || [];
+  const done = subs.filter(s => s.done).length;
+  const pct  = subs.length ? Math.round(done / subs.length * 100) : 0;
+  // Update the mini progress strip on the card
+  const fill = document.getElementById('wp-spfill-' + taskId);
+  if (fill) fill.style.width = pct + '%';
+  // Update the detail panel label (subtask count)
+  const toggle = document.querySelector(`[onclick*="wpToggleDetails('${taskId}')"]`);
+  if (toggle && subs.length) {
+    const arrow = toggle.querySelector('.wp-details-arrow');
+    toggle.innerHTML = '';
+    if (arrow) toggle.appendChild(arrow);
+    toggle.append(` ${done}/${subs.length} subtasks`);
+  }
+  // Re-render the panel inner content (preserves open/close state)
+  const inner = document.getElementById('wp-details-inner-' + taskId);
+  if (inner) inner.innerHTML = wpDetailsInnerHTML(task);
+  // Ensure a missing strip is added when first subtask is created
+  const body = document.querySelector(`.pool-card[data-id="${taskId}"] .pool-card-body`);
+  if (body && subs.length) {
+    let strip = document.getElementById('wp-spfill-' + taskId);
+    if (!strip) {
+      const prog = document.createElement('div');
+      prog.className = 'wp-card-subprog';
+      prog.innerHTML = `<div class="wp-card-subprog-fill" id="wp-spfill-${taskId}" style="width:${pct}%"></div>`;
+      const toggle2 = body.querySelector('.wp-details-toggle');
+      if (toggle2) body.insertBefore(prog, toggle2);
+    }
+  }
+}
+
+function wpAddSubtask(taskId) {
+  const inp = document.getElementById('wp-sub-inp-' + taskId);
+  const text = (inp ? inp.value : '').trim();
+  if (!text) { if (inp) inp.focus(); return; }
+  const task = (S.weeklyTasks || []).find(t => t.id === taskId);
+  if (!task) return;
+  if (!task.subtasks) task.subtasks = [];
+  task.subtasks.push({ id: generateId(), text, done: false });
+  if (inp) inp.value = '';
+  saveState();
+  _refreshTaskDetails(taskId);
+}
+
+function wpToggleSubtask(taskId, subId) {
+  const task = (S.weeklyTasks || []).find(t => t.id === taskId);
+  if (!task || !task.subtasks) return;
+  const sub = task.subtasks.find(s => s.id === subId);
+  if (sub) sub.done = !sub.done;
+  saveState();
+  _refreshTaskDetails(taskId);
+}
+
+function wpDeleteSubtask(taskId, subId) {
+  const task = (S.weeklyTasks || []).find(t => t.id === taskId);
+  if (!task || !task.subtasks) return;
+  task.subtasks = task.subtasks.filter(s => s.id !== subId);
+  saveState();
+  _refreshTaskDetails(taskId);
+}
+
+function wpSaveNotes(taskId, text) {
+  const task = (S.weeklyTasks || []).find(t => t.id === taskId);
+  if (!task) return;
+  task.notes = text;
+  saveState();
+}
+
+function _restoreExpandedCards() {
+  _wpExpandedTasks.forEach(id => {
+    const panel = document.getElementById('wp-details-' + id);
+    const arrow = document.getElementById('wp-darr-' + id);
+    if (panel) { panel.classList.add('open'); if (arrow) arrow.style.transform = 'rotate(180deg)'; }
+    else _wpExpandedTasks.delete(id); // card no longer in DOM
+  });
 }
 
 function wpDrop(e, day) {
