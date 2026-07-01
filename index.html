@@ -3183,28 +3183,67 @@ async function syncDown() {
   showSyncStatus('syncing');
   const remote = await cloudGet('goga2026_state');
   if (remote) {
-    // Merge remote into local — but never overwrite a non-empty local value
-    // with an empty remote one (prevents a stale/reset remote from wiping local data).
     const merged = { ...S };
+    let localWon = false;
+
     for (const [k, rv] of Object.entries(remote)) {
       const lv = S[k];
+
+      // Schema version: always keep the highest so migrations don't re-run after sync
+      if (k === 'schemaVersion') {
+        const max = Math.max(lv || 0, rv || 0);
+        merged.schemaVersion = max;
+        if (max > (rv || 0)) localWon = true;
+        continue;
+      }
+
+      // S.fin: deep-merge sub-arrays — local wins if local has more entries
+      if (k === 'fin' && rv && typeof rv === 'object' && !Array.isArray(rv)) {
+        const localFin = lv || {};
+        const mergedFin = { ...rv };
+        for (const sub of ['transactions', 'debts', 'goals', 'customCategories', 'budgetTargets']) {
+          const lArr = localFin[sub];
+          const rArr = rv[sub];
+          if (Array.isArray(lArr) && lArr.length > (Array.isArray(rArr) ? rArr.length : 0)) {
+            mergedFin[sub] = lArr;
+            localWon = true;
+          }
+        }
+        merged.fin = mergedFin;
+        continue;
+      }
+
+      // Goals: local wins if it has same or more goals (handles migration adding new seeds)
+      if (k === 'goals' && Array.isArray(rv) && Array.isArray(lv)) {
+        if (lv.length >= rv.length) {
+          const localIds = new Set(lv.map(g => g.id));
+          const extras = rv.filter(g => !localIds.has(g.id));
+          merged.goals = extras.length ? [...lv, ...extras] : lv;
+          localWon = true;
+        } else {
+          merged.goals = rv;
+        }
+        continue;
+      }
+
       const remoteEmpty = rv === null || rv === undefined ||
         (Array.isArray(rv) && rv.length === 0) ||
         (rv && typeof rv === 'object' && !Array.isArray(rv) && Object.keys(rv).length === 0);
       const localHasData = lv !== null && lv !== undefined &&
         (Array.isArray(lv) ? lv.length > 0 : (typeof lv === 'object' ? Object.keys(lv).length > 0 : true));
-      // Remote wins unless it's empty and local has data
-      if (remoteEmpty && localHasData) continue;
+      if (remoteEmpty && localHasData) { localWon = true; continue; }
       merged[k] = rv;
     }
+
     S = merged;
-    // Refresh aliases so UI reads from the merged remote data
     if (S.goals)           GOALS               = S.goals;
     if (S.catColors)       CAT_COLORS          = S.catColors;
     if (S.habitDefsDaily)  DEFAULT_DAILY       = S.habitDefsDaily;
     if (S.habitDefsWeekly) DEFAULT_WEEKLY      = S.habitDefsWeekly;
     if (S.habitDefsFreq)   DEFAULT_FREQ_HABITS = S.habitDefsFreq;
     saveLocal();
+    // Push corrected state back so Supabase stays current after local-wins decisions
+    if (localWon) cloudSet('goga2026_state', S);
   }
   showSyncStatus('synced');
 }
