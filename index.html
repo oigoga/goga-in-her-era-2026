@@ -1766,6 +1766,18 @@ body {
   transition:all 0.15s; line-height:1.8;
 }
 .goal-action-btn:hover { background:var(--blush); color:var(--warm-dark); border-color:var(--rose); }
+.goal-achieve-btn { background:#FFF8E6; border-color:#C9A96E; color:#8A6200; }
+.goal-achieve-btn:hover { background:#FFF0C8; color:#5A3E00; border-color:#C9A96E; }
+.goal-card.achieved { border:2px solid #C9A96E; }
+.status-achieved { background:linear-gradient(90deg,#C9A96E,#E8B775); color:#3A2A00; font-weight:700; }
+.notif-bell {
+  position:absolute; top:14px; right:14px;
+  background:rgba(255,255,255,0.15); border:none; border-radius:50%;
+  width:38px; height:38px; cursor:pointer; font-size:17px;
+  color:#fff; display:flex; align-items:center; justify-content:center;
+  transition:background 0.2s; z-index:2;
+}
+.notif-bell:hover { background:rgba(255,255,255,0.25); }
 
 .goal-form-row { margin-bottom:16px; }
 .goal-form-label {
@@ -2565,6 +2577,7 @@ input[type=range] {
 <!-- ══════ HOME ══════ -->
 <div id="view-home" class="view active">
   <div class="home-hero">
+    <button class="notif-bell" id="notif-btn" onclick="toggleNotifications()" title="Enable task reminders">🔕</button>
     <div class="hero-greeting">Welcome back</div>
     <div class="hero-name" id="hero-name">Goga's <em>Planner</em></div>
     <div class="hero-date-line" id="hero-date"></div>
@@ -2592,11 +2605,6 @@ input[type=range] {
       <div class="stat-num" id="s-streak">0</div>
       <div class="stat-pct" style="visibility:hidden">—</div>
       <div class="stat-label">Day habit streak 🔥</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-num" id="s-week">1</div>
-      <div class="stat-pct" style="visibility:hidden">—</div>
-      <div class="stat-label">Week of Qa</div>
     </div>
   </div>
 
@@ -3650,7 +3658,8 @@ function renderCatFilters() {
 
 function statusPill(g) {
   const map = { 'in-progress':['status-going','In Progress'], 'slow-start':['status-slow','Slow Start'],
-    'paused':['status-paused','Paused'], 'not-started':['status-notstarted','Not Started'] };
+    'paused':['status-paused','Paused'], 'not-started':['status-notstarted','Not Started'],
+    'achieved':['status-achieved','✓ Achieved'], 'done':['status-achieved','✓ Done'] };
   const [cls,lbl] = map[g.status]||['status-going','In Progress'];
   return `<span class="goal-status-pill ${cls}">${lbl}</span>`;
 }
@@ -3718,8 +3727,6 @@ function renderHome() {
   document.getElementById('sidebar-verse').textContent = `"${aff.text}" — ${aff.ref}`;
 
   const wkLabel = getCurrentWeekKey(now);
-  const wkNum = parseInt(wkLabel.split('-w')[1]) || 1;
-  document.getElementById('s-week').textContent = wkNum;
   const allWeeklyTasks = getTasksForWeek(wkLabel);
 
   // ── TODAY'S SCORE — tasks assigned to today's day name ──
@@ -3885,6 +3892,8 @@ function renderHome() {
   _restoreExpandedCards();
   renderSundayRefresh('home-sunday-refresh');
   updateDynamicLabels();
+  updateNotifBtn();
+  scheduleNotificationsForToday();
 }
 
 function toggleDailyToday(hid) {
@@ -4879,12 +4888,14 @@ function renderGoals(filter) {
     const qbP = 0;
     const qcP = 0;
 
-    return `<div class="goal-card ${g.status==='paused'?'paused':''}" style="${dimmed?'opacity:0.4;':''}">
+    const isAchieved = g.status === 'achieved' || g.status === 'done';
+    return `<div class="goal-card ${g.status==='paused'?'paused':''} ${isAchieved?'achieved':''}" style="${dimmed?'opacity:0.4;':''}">
       <div class="goal-card-top">
         <div class="goal-card-meta">
           <span class="goal-num-badge">Goal ${goalNum}</span>
-          <div style="display:flex;align-items:center;gap:6px">
+          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
             ${statusPill(g)}
+            ${!isAchieved ? `<button class="goal-action-btn goal-achieve-btn" onclick="event.stopPropagation();markGoalAchieved('${g.id}')" title="Mark as achieved">🏆 Done</button>` : ''}
             <button class="goal-action-btn" onclick="event.stopPropagation();openGoalEditModal('${g.id}')" title="Edit goal">✏ Edit</button>
           </div>
         </div>
@@ -4912,6 +4923,16 @@ function renderGoals(filter) {
       </div>
     </div>`;
   }).join('');
+}
+
+function markGoalAchieved(id) {
+  const g = GOALS.find(x => String(x.id) === String(id));
+  if (!g) return;
+  g.status = 'achieved';
+  S.goalProgress[g.id] = 100;
+  saveState();
+  renderGoals(currentCatFilter);
+  toast('Goal achieved! 🏆 Incredible work!');
 }
 
 function filterGoals(f, btn) {
@@ -5006,7 +5027,9 @@ function openGoalEditModal(id) {
       <div>
         <label class="goal-form-label">Status</label>
         <select class="goal-form-select" id="gf-status">
+          <option value="in-progress" ${g.status==='in-progress'?'selected':''}>In Progress</option>
           <option value="active" ${g.status==='active'?'selected':''}>Active</option>
+          <option value="achieved" ${g.status==='achieved'?'selected':''}>✓ Achieved</option>
           <option value="paused" ${g.status==='paused'?'selected':''}>Paused</option>
           <option value="done"   ${g.status==='done'  ?'selected':''}>Done</option>
           <option value="dropped"${g.status==='dropped'?'selected':''}>Dropped</option>
@@ -7029,6 +7052,78 @@ document.addEventListener('keydown', e => {
     if (panel) panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
   }
 });
+
+// ═══════════════════════════════════════════════════
+// NOTIFICATIONS
+// ═══════════════════════════════════════════════════
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js').catch(() => {});
+}
+
+function updateNotifBtn() {
+  const btn = document.getElementById('notif-btn');
+  if (!btn) return;
+  const on = Notification && Notification.permission === 'granted' && S.notificationsEnabled;
+  btn.textContent = on ? '🔔' : '🔕';
+  btn.title = on ? 'Reminders on — click to turn off' : 'Enable task reminders';
+  btn.style.opacity = on ? '1' : '0.55';
+}
+
+async function toggleNotifications() {
+  if (!('Notification' in window)) { toast('Notifications not supported in this browser'); return; }
+  if (Notification.permission === 'denied') { toast('Notifications are blocked — enable them in your browser settings'); return; }
+  if (Notification.permission === 'granted' && S.notificationsEnabled) {
+    navigator.serviceWorker.ready.then(r => r.active?.postMessage({ type: 'CLEAR_NOTIFS' }));
+    S.notificationsEnabled = false;
+    saveState(); updateNotifBtn();
+    toast('Reminders off');
+    return;
+  }
+  const perm = await Notification.requestPermission();
+  if (perm === 'granted') {
+    S.notificationsEnabled = true;
+    saveState(); scheduleNotificationsForToday(); updateNotifBtn();
+    toast('Reminders on 🔔 — I\'ll remind you 10 min before each task');
+  } else {
+    toast('Permission not granted — check browser settings');
+  }
+}
+
+function parseProposedTime(str) {
+  if (!str) return null;
+  const m = str.match(/(\d{1,2}):(\d{2})\s*(am|pm)?/i);
+  if (!m) return null;
+  let h = parseInt(m[1]);
+  const min = parseInt(m[2]);
+  const ampm = (m[3] || '').toLowerCase();
+  if (ampm === 'pm' && h !== 12) h += 12;
+  if (ampm === 'am' && h === 12) h = 0;
+  return {h, min};
+}
+
+function scheduleNotificationsForToday() {
+  if (!('serviceWorker' in navigator)) return;
+  if (!window.Notification || Notification.permission !== 'granted') return;
+  if (!S.notificationsEnabled) return;
+  const now = getToday();
+  const todayDayName = WP_DAYS[now.getDay() === 0 ? 6 : now.getDay() - 1];
+  const wkLabel = getCurrentWeekKey(now);
+  const tasks = getTasksForWeek(wkLabel).filter(t => t.assignedDay === todayDayName && !t.completed && t.proposedTime);
+  navigator.serviceWorker.ready.then(reg => {
+    if (!reg.active) return;
+    reg.active.postMessage({ type: 'CLEAR_NOTIFS' });
+    tasks.forEach(task => {
+      const t = parseProposedTime(task.proposedTime);
+      if (!t) return;
+      const taskTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), t.h, t.min, 0, 0);
+      const delay = taskTime.getTime() - 10 * 60 * 1000 - now.getTime();
+      if (delay > 0 && delay < 24 * 60 * 60 * 1000) {
+        reg.active.postMessage({ type: 'SCHEDULE_NOTIF', id: task.id, delay,
+          title: task.text, body: `Starting at ${task.proposedTime} · tap to open planner` });
+      }
+    });
+  });
+}
 
 // INIT — load local first, then sync from cloud
 // ═══════════════════════════════════════════════════
