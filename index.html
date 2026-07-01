@@ -1185,39 +1185,41 @@ body {
 .f-btn:hover { background:var(--parchment); color:var(--warm-dark); }
 .f-btn.active { background:var(--warm-dark); color:#fff; border-color:var(--warm-dark); }
 
-.goals-grid {
-  display:grid; grid-template-columns:repeat(auto-fill,minmax(310px,1fr)); gap:16px;
+/* Goals 3-section layout */
+.goals-grid { display:flex; flex-direction:column; gap:0; }
+.goals-section-wrap { margin-bottom:28px; }
+.goals-section-hdr {
+  display:flex; align-items:center; gap:10px;
+  font-family:'Cormorant Garamond',serif; font-size:20px; font-weight:700;
+  color:var(--warm-dark); margin-bottom:14px;
+}
+.goals-section-hdr.gold-hdr { color:#8A6200; }
+.goals-section-hdr.dim-hdr { color:var(--warm-muted); font-size:17px; }
+.goals-section-hdr .gsec-count {
+  font-size:11px; font-weight:700; font-family:'Poppins',sans-serif;
+  background:var(--linen); color:var(--warm-muted);
+  padding:2px 10px; border-radius:10px;
+}
+.goals-grid-inner {
+  display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:16px;
 }
 
+/* Goal card */
 .goal-card {
-  background:var(--white);
-  border:1px solid var(--blush);
-  border-radius:18px;
-  overflow:hidden;
-  cursor:pointer;
-  transition:all 0.25s;
-  box-shadow:0 2px 10px var(--shadow);
+  background:var(--white); border:1.5px solid var(--blush); border-radius:18px;
+  padding:18px 18px 14px; transition:all 0.2s; box-shadow:0 2px 10px var(--shadow);
 }
-
-.goal-card:hover {
-  border-color:var(--rose);
-  transform:translateY(-3px);
-  box-shadow:0 8px 24px var(--shadow-md);
+.goal-card:hover { border-color:var(--rose); box-shadow:0 6px 20px var(--shadow-md); transform:translateY(-2px); }
+.goal-card.paused { opacity:0.6; }
+.goal-card.achieved {
+  background:linear-gradient(135deg,#FFFBEE,#FFF3C4);
+  border:2px solid #C9A96E;
+  box-shadow:0 4px 20px rgba(201,169,110,0.3);
 }
+.goal-card.achieved:hover { border-color:#B8882A; }
 
-.goal-card.paused { opacity:0.55; }
-
-.goal-card-top { padding:20px 20px 0; }
-
-.goal-card-meta {
-  display:flex; align-items:center; justify-content:space-between;
-  margin-bottom:10px;
-}
-
-.goal-num-badge {
-  font-size:11px; font-weight:700; color:var(--warm-muted);
-  letter-spacing:0.5px;
-}
+.goal-card-header { display:flex; align-items:flex-start; justify-content:space-between; gap:6px; margin-bottom:10px; }
+.goal-card-actions { display:flex; gap:5px; flex-shrink:0; flex-wrap:wrap; justify-content:flex-end; }
 
 .goal-status-pill {
   font-size:10px; font-weight:700; padding:3px 10px;
@@ -1228,51 +1230,49 @@ body {
 .status-notstarted { background:#fce8e8; color:#8a3a3a; }
 .status-slow { background:#fff8e0; color:#8a6a20; }
 
+/* Goal number badge — kept for quarterly overview */
+.goal-num-badge { font-size:11px; font-weight:700; color:var(--warm-muted); letter-spacing:0.5px; }
+
 .goal-card-name {
-  font-family:'Cormorant Garamond',serif;
-  font-size:17px; font-weight:700;
-  color:var(--warm-dark); line-height:1.3;
-  margin-bottom:8px;
+  font-family:'Cormorant Garamond',serif; font-size:19px; font-weight:700;
+  color:var(--warm-dark); line-height:1.3; margin-bottom:6px;
 }
-
 .goal-card-cat {
-  display:inline-block;
-  font-size:10px; font-weight:700;
+  display:inline-block; font-size:10px; font-weight:700;
   letter-spacing:1px; text-transform:uppercase;
-  padding:3px 10px; border-radius:10px;
-  margin-bottom:14px;
+  padding:3px 10px; border-radius:10px; margin-bottom:10px;
 }
+.goal-note { font-size:12px; color:var(--warm-muted); line-height:1.5; margin-bottom:10px; font-style:italic; }
 
-/* Progress section */
-.goal-card-progress { padding:0 20px 14px; }
+/* Progress bar */
+.goal-prog-wrap { display:flex; align-items:center; gap:10px; margin-bottom:6px; }
+.goal-prog-bar { flex:1; height:8px; background:var(--blush); border-radius:8px; overflow:hidden; }
+.goal-prog-fill { height:100%; border-radius:8px; background:linear-gradient(90deg,var(--gold),#F4D060); transition:width 0.4s; }
+.goal-card.achieved .goal-prog-fill { background:linear-gradient(90deg,#C9A96E,#F0C060); }
+.goal-prog-pct { font-size:12px; font-weight:700; color:var(--warm-dark); min-width:30px; text-align:right; }
 
-.q-progress-row {
-  display:grid; grid-template-columns:repeat(3,1fr); gap:6px;
-  margin-bottom:10px;
-}
+/* Manual slider */
+.goal-prog-slider { width:100%; -webkit-appearance:none; appearance:none; height:3px; border-radius:3px; background:var(--blush); outline:none; margin:2px 0 10px; cursor:pointer; }
+.goal-prog-slider::-webkit-slider-thumb { -webkit-appearance:none; appearance:none; width:16px; height:16px; border-radius:50%; background:var(--gold); cursor:pointer; box-shadow:0 1px 4px rgba(0,0,0,0.2); }
 
-.q-prog {
-  text-align:center;
-  background:var(--linen);
-  border-radius:10px;
-  padding:8px 6px;
-}
+/* Sub-goals */
+.goal-subgoals { margin:8px 0 4px; border-top:1px solid var(--blush); padding-top:8px; }
+.goal-subgoal { display:flex; align-items:center; gap:8px; padding:4px 0; }
+.goal-subgoal input[type=checkbox] { accent-color:var(--gold); width:14px; height:14px; flex-shrink:0; cursor:pointer; }
+.goal-subgoal label { font-size:12px; color:var(--warm-dark); flex:1; cursor:pointer; line-height:1.4; }
+.goal-subgoal label.sg-done { text-decoration:line-through; color:var(--warm-muted); }
+.sg-del { background:none; border:none; font-size:13px; color:var(--warm-muted); cursor:pointer; opacity:0.35; padding:0 2px; flex-shrink:0; }
+.sg-del:hover { opacity:1; color:var(--terracotta); }
+.goal-add-sg { display:flex; gap:6px; margin-top:8px; }
+.sg-input { flex:1; padding:6px 10px; border:1px solid var(--blush-deep); border-radius:8px; font-family:'Poppins',sans-serif; font-size:11px; background:var(--linen); outline:none; color:var(--warm-dark); }
+.sg-input:focus { border-color:var(--rose); }
+.sg-add-btn { background:var(--gold); border:none; border-radius:8px; padding:6px 12px; font-size:14px; font-weight:700; color:var(--warm-dark); cursor:pointer; }
 
-.q-prog-label {
-  font-size:9px; font-weight:700;
-  text-transform:uppercase; letter-spacing:1px;
-  color:var(--warm-muted); margin-bottom:4px;
-}
-
-.q-prog-bar {
-  height:4px; background:var(--blush); border-radius:4px;
-  overflow:hidden; margin-bottom:4px;
-}
-
+/* Qa/Qb/Qc — kept for quarterly overview only */
+.q-prog-bar { height:4px; background:var(--blush); border-radius:4px; overflow:hidden; margin-bottom:4px; }
 .q-prog-fill { height:100%; border-radius:4px; background:var(--sage); }
 .q-prog-fill.gold { background:var(--gold); }
 .q-prog-fill.rose { background:var(--rose); }
-
 .q-prog-pct { font-size:11px; font-weight:700; color:var(--warm-dark); }
 
 /* ═══════════════════════════════════════
@@ -1982,13 +1982,11 @@ input[type=range] {
   /* ── GOALS ── */
   .goals-filter-row { gap: 6px; }
   .f-btn { padding: 5px 11px; font-size: 10px; border-radius: 18px; }
-  .goals-grid { grid-template-columns: 1fr; gap: 12px; }
+  .goals-grid-inner { grid-template-columns: 1fr; gap: 12px; }
   .goal-card { border-radius: 16px; }
   .goal-card:hover { transform: none; } /* disable lift on touch */
-  .goal-card-top { padding: 16px 16px 0; }
+  .goal-card { padding: 14px 14px 12px; }
   .goal-card-name { font-size: 15px; }
-  .goal-card-progress { padding: 0 16px 12px; }
-  .q-progress-row { grid-template-columns: 1fr 1fr 1fr; gap: 4px; }
   .yearly-goals-footer { margin-top: 28px; padding: 20px 16px; }
 
   /* ── HABITS ── */
@@ -2100,8 +2098,6 @@ input[type=range] {
   .hero-name { font-size: 22px; }
   .fin-tab { padding: 8px 3px; font-size: 10px; }
   .wp-day-tab { min-width: 36px; padding: 7px 4px; font-size: 9px; }
-  .goal-card-top { padding: 14px 14px 0; }
-  .goal-card-progress { padding: 0 14px 10px; }
   .page-title { font-size: 21px; }
 }
 /* ═══════════════════════════════════════
@@ -3332,6 +3328,76 @@ let S = loadState();
   S.customWeeklyHabits = [];
   S.customFreqHabits   = [];
   S.schemaVersion = 6;
+  try { localStorage.setItem('goga2026v2', JSON.stringify(S)); } catch {}
+})();
+
+(function runMigrationV7() {
+  if (S.schemaVersion >= 7) return;
+  // Add subGoals field to all existing goals
+  if (S.goals) S.goals = S.goals.map(g => ({ ...g, subGoals: g.subGoals || [] }));
+  // Seed new H2 2026 goals (skip if already present by id)
+  const existing = new Set((S.goals||[]).map(g=>g.id));
+  const newGoals = [
+    { id:101, cat:'MONEY', name:'Hit $9,500 target by September', status:'in-progress', progress:0,
+      note:'Save aggressively. Includes emergency fund. Follow budget strictly.',
+      subGoals:[], weekly:{} },
+    { id:102, cat:'MONEY', name:'Get into Forex by August', status:'in-progress', progress:0,
+      note:'Budget: $300 ($100 sub + $200 funding). Target $600 in month 1. All forex profits go to house project until complete.',
+      subGoals:[
+        {id:'sg102a',text:'Subscribe ($100)',completed:false},
+        {id:'sg102b',text:'Fund account ($200)',completed:false},
+        {id:'sg102c',text:'Make $600 in month 1',completed:false},
+        {id:'sg102d',text:'Hit $20k milestone',completed:false}
+      ], weekly:{} },
+    { id:103, cat:'BUSINESS', name:'Run a successful workshop', status:'in-progress', progress:0,
+      note:'Convert 20% of attendees. Full track target: 10 clients (₦3m). Revenue target: ₦7m–₦10m.',
+      subGoals:[
+        {id:'sg103a',text:'Run the workshop',completed:false},
+        {id:'sg103b',text:'Convert 20% of attendees',completed:false},
+        {id:'sg103c',text:'Hit ₦7m–₦10m revenue',completed:false}
+      ], weekly:{} },
+    { id:104, cat:'BUSINESS', name:'Launch cohort platforms + do 2–3 cohorts', status:'in-progress', progress:0,
+      note:'',
+      subGoals:[
+        {id:'sg104a',text:'Launch cohort platform 1',completed:false},
+        {id:'sg104b',text:'Launch cohort platform 2',completed:false},
+        {id:'sg104c',text:'Run cohort 1',completed:false},
+        {id:'sg104d',text:'Run cohort 2',completed:false},
+        {id:'sg104e',text:'Run cohort 3 (optional)',completed:false}
+      ], weekly:{} },
+    { id:105, cat:'BUSINESS', name:'Register LLC', status:'in-progress', progress:0,
+      note:'', subGoals:[], weekly:{} },
+    { id:106, cat:'GROWTH', name:'Understand myself better + finish journaling', status:'in-progress', progress:0,
+      note:'Who am I? Complete the journaling sessions. Observation season.',
+      subGoals:[], weekly:{} },
+    { id:107, cat:'FAITH', name:'Daily Bible + prayer + weekly fast', status:'in-progress', progress:0,
+      note:'Read Bible daily. Pray 30 min daily. Fast 1 day/week — break fast with 30min prayer.',
+      subGoals:[
+        {id:'sg107a',text:'Set a dedicated weekly fast day',completed:false},
+        {id:'sg107b',text:'Daily Bible reading — consistent',completed:false},
+        {id:'sg107c',text:'30min daily prayer habit',completed:false},
+        {id:'sg107d',text:'Weekly fast — 4 weeks straight',completed:false}
+      ], weekly:{} },
+    { id:108, cat:'HEALTH', name:'Build morning & night routines', status:'in-progress', progress:0,
+      note:'Design and stick to solid routines consistently.',
+      subGoals:[
+        {id:'sg108a',text:'Design morning routine',completed:false},
+        {id:'sg108b',text:'Design night routine',completed:false},
+        {id:'sg108c',text:'Stick to both for 2 weeks straight',completed:false}
+      ], weekly:{} },
+    { id:109, cat:'GROWTH', name:'Upskilling — APIs, MCPs, PM, Systems', status:'in-progress', progress:0,
+      note:'',
+      subGoals:[
+        {id:'sg109a',text:'Using API endpoints',completed:false},
+        {id:'sg109b',text:'Using MCPs',completed:false},
+        {id:'sg109c',text:'Project Management',completed:false},
+        {id:'sg109d',text:'Business Operations',completed:false},
+        {id:'sg109e',text:'Operations systems',completed:false},
+        {id:'sg109f',text:'Thinking in systems',completed:false}
+      ], weekly:{} }
+  ];
+  newGoals.forEach(g => { if (!existing.has(g.id)) S.goals.push(g); });
+  S.schemaVersion = 7;
   try { localStorage.setItem('goga2026v2', JSON.stringify(S)); } catch {}
 })();
 
@@ -4899,70 +4965,152 @@ function deleteHabit(type, id) {
 // ═══════════════════════════════════════════════════
 let currentCatFilter = 'ALL';
 
+// ── Progress helpers ─────────────────────────────────────────────────────────
+function getGoalProgress(g) {
+  const subs = g.subGoals || [];
+  if (subs.length > 0) {
+    return Math.round(subs.filter(s => s.completed).length / subs.length * 100);
+  }
+  return S.goalProgress[g.id] !== undefined ? S.goalProgress[g.id] : (g.progress || 0);
+}
+
+// ── Render ───────────────────────────────────────────────────────────────────
 function renderGoals(filter) {
   currentCatFilter = filter;
-  const list = filter==='ALL'?GOALS:GOALS.filter(g=>g.cat===filter);
+  const list = (filter === 'ALL') ? GOALS : GOALS.filter(g => g.cat === filter);
   renderCatFilters();
   const countEl = document.getElementById('goals-page-count');
   if (countEl) countEl.textContent = `${GOALS.length} Goals`;
 
-  // Inactive = 0% progress → sorted last + dimmed
-  const isInactive = g => {
-    const prog = S.goalProgress[g.id] !== undefined ? S.goalProgress[g.id] : (g.progress || 0);
-    return prog === 0;
-  };
-  const sorted = [...list.filter(g => !isInactive(g)), ...list.filter(g => isInactive(g))];
+  const isAchieved = g => g.status === 'achieved' || g.status === 'done';
+  const isPaused   = g => g.status === 'paused' || g.status === 'dropped';
+  const isCurrent  = g => !isAchieved(g) && !isPaused(g);
 
-  document.getElementById('goals-grid').innerHTML = sorted.map(g => {
-    const goalNum  = GOALS.indexOf(g) + 1;
-    const prog     = S.goalProgress[g.id] !== undefined ? S.goalProgress[g.id] : (g.progress || 0);
-    const dimmed   = isInactive(g);
+  const current  = list.filter(isCurrent);
+  const achieved = list.filter(isAchieved);
+  const paused   = list.filter(isPaused);
 
-    const qaP = prog;
-    const qbP = 0;
-    const qcP = 0;
+  function section(goals, label, cls) {
+    if (!goals.length) return '';
+    return `
+      <div class="goals-section-wrap">
+        <div class="goals-section-hdr ${cls}">${label} <span class="gsec-count">${goals.length}</span></div>
+        <div class="goals-grid-inner">${goals.map(goalCardHTML).join('')}</div>
+      </div>`;
+  }
 
-    const isAchieved = g.status === 'achieved' || g.status === 'done';
-    return `<div class="goal-card ${g.status==='paused'?'paused':''} ${isAchieved?'achieved':''}" style="${dimmed?'opacity:0.4;':''}">
-      <div class="goal-card-top">
-        <div class="goal-card-meta">
-          <span class="goal-num-badge">Goal ${goalNum}</span>
-          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
-            ${statusPill(g)}
-            ${!isAchieved ? `<button class="goal-action-btn goal-achieve-btn" onclick="event.stopPropagation();markGoalAchieved('${g.id}')" title="Mark as achieved">🏆 Done</button>` : ''}
-            <button class="goal-action-btn" onclick="event.stopPropagation();openGoalEditModal('${g.id}')" title="Edit goal">✏ Edit</button>
-          </div>
-        </div>
-        <div class="goal-card-name">${g.name}</div>
-        ${catChipHTML(g.cat).replace('cat-chip','goal-card-cat cat-chip')}
-      </div>
-      <div class="goal-card-progress">
-        <div class="q-progress-row">
-          <div class="q-prog">
-            <div class="q-prog-label">Qa · Mar–May</div>
-            <div class="q-prog-bar"><div class="q-prog-fill" style="width:${qaP}%"></div></div>
-            <div class="q-prog-pct">${qaP}%</div>
-          </div>
-          <div class="q-prog">
-            <div class="q-prog-label">Qb · Jun–Aug</div>
-            <div class="q-prog-bar"><div class="q-prog-fill gold" style="width:${qbP}%"></div></div>
-            <div class="q-prog-pct">${qbP}%</div>
-          </div>
-          <div class="q-prog">
-            <div class="q-prog-label">Qc · Sep–Nov</div>
-            <div class="q-prog-bar"><div class="q-prog-fill rose" style="width:${qcP}%"></div></div>
-            <div class="q-prog-pct">${qcP}%</div>
-          </div>
-        </div>
-      </div>
-    </div>`;
-  }).join('');
+  document.getElementById('goals-grid').innerHTML =
+    section(current,  'Current Goals',  '') +
+    section(achieved, 'Achieved Goals', 'gold-hdr') +
+    section(paused,   'Paused Goals',   'dim-hdr');
 }
 
+function goalCardHTML(g) {
+  const prog      = getGoalProgress(g);
+  const achieved  = g.status === 'achieved' || g.status === 'done';
+  const subs      = g.subGoals || [];
+  const noSubs    = subs.length === 0;
+  const note      = S.goalNotes[g.id] || g.note || '';
+
+  return `<div class="goal-card ${achieved ? 'achieved' : ''} ${g.status === 'paused' || g.status === 'dropped' ? 'paused' : ''}">
+    <div class="goal-card-header">
+      ${catChipHTML(g.cat).replace('cat-chip','goal-card-cat cat-chip')}
+      <div class="goal-card-actions">
+        ${statusPill(g)}
+        ${!achieved ? `<button class="goal-action-btn goal-achieve-btn" onclick="markGoalAchieved('${g.id}')" title="Mark done">🏆</button>` : ''}
+        <button class="goal-action-btn" onclick="openGoalEditModal('${g.id}')">✏</button>
+      </div>
+    </div>
+    <div class="goal-card-name">${g.name}</div>
+    ${note ? `<div class="goal-note">${note}</div>` : ''}
+
+    <div class="goal-prog-wrap">
+      <div class="goal-prog-bar"><div class="goal-prog-fill" id="gpf-${g.id}" style="width:${prog}%"></div></div>
+      <div class="goal-prog-pct" id="gpp-${g.id}">${prog}%</div>
+    </div>
+    ${noSubs && !achieved ? `<input type="range" class="goal-prog-slider" min="0" max="100" value="${prog}"
+      oninput="setGoalProgress('${g.id}',this.value)">` : ''}
+
+    ${subs.length > 0 ? `<div class="goal-subgoals">
+      ${subs.map(sg => `<div class="goal-subgoal">
+        <input type="checkbox" id="sg-${sg.id}" ${sg.completed ? 'checked' : ''}
+          onchange="toggleSubGoal('${g.id}','${sg.id}',this.checked)">
+        <label for="sg-${sg.id}" class="${sg.completed ? 'sg-done' : ''}">${sg.text}</label>
+        ${!achieved ? `<button class="sg-del" onclick="deleteSubGoal('${g.id}','${sg.id}')">×</button>` : ''}
+      </div>`).join('')}
+    </div>` : ''}
+
+    ${!achieved ? `<div class="goal-add-sg">
+      <input id="sg-inp-${g.id}" class="sg-input" placeholder="Add a sub-goal…"
+        onkeydown="if(event.key==='Enter')addSubGoal('${g.id}')">
+      <button class="sg-add-btn" onclick="addSubGoal('${g.id}')">+</button>
+    </div>` : ''}
+  </div>`;
+}
+
+// ── Sub-goal actions ─────────────────────────────────────────────────────────
+function addSubGoal(goalId) {
+  const inp = document.getElementById('sg-inp-' + goalId);
+  if (!inp) return;
+  const text = inp.value.trim();
+  if (!text) return;
+  const g = GOALS.find(x => String(x.id) === String(goalId));
+  if (!g) return;
+  if (!g.subGoals) g.subGoals = [];
+  g.subGoals.push({ id: 'sg' + Date.now(), text, completed: false });
+  saveState();
+  renderGoals(currentCatFilter);
+}
+
+function toggleSubGoal(goalId, subId, checked) {
+  const g = GOALS.find(x => String(x.id) === String(goalId));
+  if (!g || !g.subGoals) return;
+  const sg = g.subGoals.find(s => s.id === subId);
+  if (sg) sg.completed = checked;
+  const prog = getGoalProgress(g);
+  S.goalProgress[g.id] = prog;
+  g.progress = prog;
+  // Update bar in DOM directly (avoid full re-render)
+  const fill = document.getElementById('gpf-' + goalId);
+  const pct  = document.getElementById('gpp-' + goalId);
+  if (fill) fill.style.width = prog + '%';
+  if (pct)  pct.textContent  = prog + '%';
+  // Update label strike-through
+  const lbl = document.querySelector(`label[for="sg-${subId}"]`);
+  if (lbl) { lbl.classList.toggle('sg-done', checked); }
+  saveState();
+}
+
+function deleteSubGoal(goalId, subId) {
+  const g = GOALS.find(x => String(x.id) === String(goalId));
+  if (!g || !g.subGoals) return;
+  g.subGoals = g.subGoals.filter(s => s.id !== subId);
+  const prog = getGoalProgress(g);
+  S.goalProgress[g.id] = prog;
+  g.progress = prog;
+  saveState();
+  renderGoals(currentCatFilter);
+}
+
+function setGoalProgress(goalId, val) {
+  const g = GOALS.find(x => String(x.id) === String(goalId));
+  if (!g) return;
+  const prog = parseInt(val, 10);
+  S.goalProgress[g.id] = prog;
+  g.progress = prog;
+  const fill = document.getElementById('gpf-' + goalId);
+  const pct  = document.getElementById('gpp-' + goalId);
+  if (fill) fill.style.width = prog + '%';
+  if (pct)  pct.textContent  = prog + '%';
+  saveState();
+}
+
+// ── Achieved ─────────────────────────────────────────────────────────────────
 function markGoalAchieved(id) {
   const g = GOALS.find(x => String(x.id) === String(id));
   if (!g) return;
   g.status = 'achieved';
+  g.progress = 100;
   S.goalProgress[g.id] = 100;
   saveState();
   renderGoals(currentCatFilter);
@@ -4970,21 +5118,23 @@ function markGoalAchieved(id) {
 }
 
 function filterGoals(f, btn) {
-  document.querySelectorAll('.f-btn').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.f-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
   renderGoals(f);
 }
 
-function openGoalAddModal() {
+// ── Add / Edit modal (simplified) ────────────────────────────────────────────
+function _goalModalHTML(g) {
   const catOptions = Object.keys(CAT_COLORS).map(c =>
-    `<option value="${c}">${c}</option>`
-  ).join('');
-  document.getElementById('modal-body').innerHTML = `
-    <button class="modal-close" onclick="document.getElementById('modal-overlay').classList.remove('open')">✕</button>
-    <div class="modal-goal-title" style="font-size:18px">Add New Goal</div>
+    `<option value="${c}" ${g&&c===g.cat?'selected':''}>${c}</option>`).join('');
+  const prog = g ? getGoalProgress(g) : 0;
+  const note = g ? (S.goalNotes[g.id] || g.note || '') : '';
+  const hasSubs = g && (g.subGoals||[]).length > 0;
+  return `
     <div class="goal-form-row">
       <label class="goal-form-label">Goal name</label>
-      <input class="goal-form-input" id="gf-name" placeholder="e.g. Launch YouTube channel">
+      <input class="goal-form-input" id="gf-name" placeholder="e.g. Hit $9,500 by September"
+        value="${g ? (g.name||'').replace(/"/g,'&quot;') : ''}">
     </div>
     <div class="goal-form-2col">
       <div>
@@ -4994,45 +5144,29 @@ function openGoalAddModal() {
       <div>
         <label class="goal-form-label">Status</label>
         <select class="goal-form-select" id="gf-status">
-          <option value="active">Active</option>
-          <option value="paused">Paused</option>
+          <option value="in-progress" ${!g||g.status==='in-progress'?'selected':''}>In Progress</option>
+          <option value="achieved"    ${g&&g.status==='achieved'?'selected':''}>✓ Achieved</option>
+          <option value="paused"      ${g&&g.status==='paused'?'selected':''}>Paused</option>
+          <option value="not-started" ${g&&g.status==='not-started'?'selected':''}>Not Started</option>
         </select>
       </div>
     </div>
     <div class="goal-form-row">
-      <label class="goal-form-label">Decision / Why this goal</label>
-      <input class="goal-form-input" id="gf-decision" placeholder="One-line reason">
-    </div>
-    <div class="goal-form-row">
-      <label class="goal-form-label">Rewritten goal (vivid present-tense)</label>
-      <textarea class="goal-form-textarea" id="gf-rewrite" placeholder="I am / I have / I do..."></textarea>
-    </div>
-    <div class="goal-form-2col">
-      <div>
-        <label class="goal-form-label">Qa target (Mar–May)</label>
-        <input class="goal-form-input" id="gf-qa" placeholder="e.g. 20 videos filmed">
-      </div>
-      <div>
-        <label class="goal-form-label">Qa progress %</label>
-        <input class="goal-form-input" id="gf-prog" type="number" min="0" max="100" value="0">
-      </div>
-    </div>
-    <div class="goal-form-2col">
-      <div>
-        <label class="goal-form-label">Qb target (Jun–Aug)</label>
-        <input class="goal-form-input" id="gf-qb" placeholder="e.g. 50 videos live">
-      </div>
-      <div>
-        <label class="goal-form-label">Qc target (Sep–Nov)</label>
-        <input class="goal-form-input" id="gf-qc" placeholder="e.g. 1k subscribers">
-      </div>
-    </div>
-    <div class="goal-form-row">
       <label class="goal-form-label">Notes</label>
-      <textarea class="goal-form-textarea" id="gf-note" placeholder="Current reality, next action..."></textarea>
+      <textarea class="goal-form-textarea" id="gf-note" placeholder="Context, targets, next action…">${note}</textarea>
     </div>
-    <button class="modal-save-btn" style="width:100%" onclick="saveGoalForm(null)">Add Goal ✓</button>
-  `;
+    ${g && !hasSubs ? `<div class="goal-form-row">
+      <label class="goal-form-label">Progress % (drag slider on the card, or set here)</label>
+      <input class="goal-form-input" id="gf-prog" type="number" min="0" max="100" value="${prog}">
+    </div>` : ''}`;
+}
+
+function openGoalAddModal() {
+  document.getElementById('modal-body').innerHTML = `
+    <button class="modal-close" onclick="document.getElementById('modal-overlay').classList.remove('open')">✕</button>
+    <div class="modal-goal-title" style="font-size:18px">Add New Goal</div>
+    ${_goalModalHTML(null)}
+    <button class="modal-save-btn" style="width:100%" onclick="saveGoalForm(null)">Add Goal ✓</button>`;
   document.getElementById('modal-overlay').classList.add('open');
   document.getElementById('gf-name').focus();
 }
@@ -5040,119 +5174,46 @@ function openGoalAddModal() {
 function openGoalEditModal(id) {
   const g = GOALS.find(x => String(x.id) === String(id));
   if (!g) return;
-  const goalNum  = GOALS.indexOf(g) + 1;
-  const prog     = S.goalProgress[g.id] !== undefined ? S.goalProgress[g.id] : (g.progress || 0);
-  const note     = S.goalNotes[g.id] || g.note || '';
-  const catOptions = Object.keys(CAT_COLORS).map(c =>
-    `<option value="${c}" ${c===g.cat?'selected':''}>${c}</option>`
-  ).join('');
   document.getElementById('modal-body').innerHTML = `
     <button class="modal-close" onclick="document.getElementById('modal-overlay').classList.remove('open')">✕</button>
-    <div class="modal-goal-title" style="font-size:18px">Edit Goal ${goalNum}</div>
-    <div class="goal-form-row">
-      <label class="goal-form-label">Goal name</label>
-      <input class="goal-form-input" id="gf-name" value="${(g.name||'').replace(/"/g,'&quot;')}">
-    </div>
-    <div class="goal-form-2col">
-      <div>
-        <label class="goal-form-label">Category</label>
-        <select class="goal-form-select" id="gf-cat">${catOptions}</select>
-      </div>
-      <div>
-        <label class="goal-form-label">Status</label>
-        <select class="goal-form-select" id="gf-status">
-          <option value="in-progress" ${g.status==='in-progress'?'selected':''}>In Progress</option>
-          <option value="active" ${g.status==='active'?'selected':''}>Active</option>
-          <option value="achieved" ${g.status==='achieved'?'selected':''}>✓ Achieved</option>
-          <option value="paused" ${g.status==='paused'?'selected':''}>Paused</option>
-          <option value="done"   ${g.status==='done'  ?'selected':''}>Done</option>
-          <option value="dropped"${g.status==='dropped'?'selected':''}>Dropped</option>
-        </select>
-      </div>
-    </div>
-    <div class="goal-form-row">
-      <label class="goal-form-label">Decision / Why this goal</label>
-      <input class="goal-form-input" id="gf-decision" value="${(g.decision||'').replace(/"/g,'&quot;')}">
-    </div>
-    <div class="goal-form-row">
-      <label class="goal-form-label">Rewritten goal</label>
-      <textarea class="goal-form-textarea" id="gf-rewrite">${g.rewrite||''}</textarea>
-    </div>
-    <div class="goal-form-2col">
-      <div>
-        <label class="goal-form-label">Qa target (Mar–May)</label>
-        <input class="goal-form-input" id="gf-qa" value="${(g.qa||'').replace(/"/g,'&quot;')}">
-      </div>
-      <div>
-        <label class="goal-form-label">Qa progress %</label>
-        <input class="goal-form-input" id="gf-prog" type="number" min="0" max="100" value="${prog}">
-      </div>
-    </div>
-    <div class="goal-form-2col">
-      <div>
-        <label class="goal-form-label">Qb target (Jun–Aug)</label>
-        <input class="goal-form-input" id="gf-qb" value="${(g.qb||'').replace(/"/g,'&quot;')}">
-      </div>
-      <div>
-        <label class="goal-form-label">Qc target (Sep–Nov)</label>
-        <input class="goal-form-input" id="gf-qc" value="${(g.qc||'').replace(/"/g,'&quot;')}">
-      </div>
-    </div>
-    <div class="goal-form-row">
-      <label class="goal-form-label">Notes</label>
-      <textarea class="goal-form-textarea" id="gf-note">${note}</textarea>
-    </div>
-    <div style="display:flex;gap:10px">
+    <div class="modal-goal-title" style="font-size:18px">Edit Goal</div>
+    ${_goalModalHTML(g)}
+    <div style="display:flex;gap:10px;margin-top:4px">
       <button class="modal-save-btn" style="flex:1" onclick="saveGoalForm('${g.id}')">Save ✓</button>
       <button class="modal-save-btn" style="flex:0 0 auto;background:var(--blush-deep);color:var(--warm-dark)"
-        onclick="deleteMainGoal('${g.id}')">🗑 Delete</button>
-    </div>
-  `;
+        onclick="deleteMainGoal('${g.id}')">🗑</button>
+    </div>`;
   document.getElementById('modal-overlay').classList.add('open');
 }
 
 function saveGoalForm(id) {
-  const name     = (document.getElementById('gf-name')?.value || '').trim();
-  const cat      = document.getElementById('gf-cat')?.value || '';
-  const status   = document.getElementById('gf-status')?.value || 'active';
-  const decision = (document.getElementById('gf-decision')?.value || '').trim();
-  const rewrite  = (document.getElementById('gf-rewrite')?.value || '').trim();
-  const qa       = (document.getElementById('gf-qa')?.value || '').trim();
-  const qb       = (document.getElementById('gf-qb')?.value || '').trim();
-  const qc       = (document.getElementById('gf-qc')?.value || '').trim();
-  const prog     = parseInt(document.getElementById('gf-prog')?.value || '0', 10);
-  const note     = (document.getElementById('gf-note')?.value || '').trim();
+  const name   = (document.getElementById('gf-name')?.value || '').trim();
+  const cat    = document.getElementById('gf-cat')?.value || 'GROWTH';
+  const status = document.getElementById('gf-status')?.value || 'in-progress';
+  const note   = (document.getElementById('gf-note')?.value || '').trim();
+  const progEl = document.getElementById('gf-prog');
+  const prog   = progEl ? parseInt(progEl.value || '0', 10) : undefined;
 
   if (!name) { toast('Please enter a goal name'); return; }
 
   if (id === null) {
-    // Add new goal
     const newId = Date.now();
-    const newGoal = {
-      id: newId, name, cat, status, decision, rewrite,
-      qa, qb, qc, progress: prog, note,
-      weekly: {},
-    };
-    GOALS.push(newGoal);
-    S.goalProgress[newId] = prog;
-    if (note) S.goalNotes[newId] = note;
+    GOALS.push({ id:newId, name, cat, status, note, progress:prog||0, subGoals:[], weekly:{} });
+    S.goalProgress[newId] = prog || 0;
+    S.goalNotes[newId] = note;
     toast('Goal added 🌸');
   } else {
-    // Update existing goal
     const g = GOALS.find(x => String(x.id) === String(id));
     if (!g) return;
-    g.name     = name;
-    g.cat      = cat;
-    g.status   = status;
-    g.decision = decision;
-    g.rewrite  = rewrite;
-    g.qa       = qa;
-    g.qb       = qb;
-    g.qc       = qc;
-    g.progress = prog;
-    g.note     = note;
-    S.goalProgress[g.id] = prog;
-    S.goalNotes[g.id]    = note;
+    g.name   = name;
+    g.cat    = cat;
+    g.status = status;
+    g.note   = note;
+    if (prog !== undefined && (!g.subGoals || g.subGoals.length === 0)) {
+      g.progress = prog;
+      S.goalProgress[g.id] = prog;
+    }
+    S.goalNotes[g.id] = note;
     toast('Goal saved ✓');
   }
 
@@ -5163,11 +5224,8 @@ function saveGoalForm(id) {
 
 function deleteMainGoal(id) {
   const g = GOALS.find(x => String(x.id) === String(id));
-  if (!g) return;
-  const goalNum = GOALS.indexOf(g) + 1;
-  if (!confirm(`Delete "Goal ${goalNum}: ${g.name}"?\n\nThis cannot be undone.`)) return;
-  const idx = GOALS.indexOf(g);
-  if (idx !== -1) GOALS.splice(idx, 1);
+  if (!g || !confirm(`Delete "${g.name}"? This cannot be undone.`)) return;
+  GOALS.splice(GOALS.indexOf(g), 1);
   delete S.goalProgress[id];
   delete S.goalNotes[id];
   saveState();
