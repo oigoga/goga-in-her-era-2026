@@ -1267,6 +1267,10 @@ body {
 .sg-input { flex:1; padding:6px 10px; border:1px solid var(--blush-deep); border-radius:8px; font-family:'Poppins',sans-serif; font-size:11px; background:var(--linen); outline:none; color:var(--warm-dark); }
 .sg-input:focus { border-color:var(--rose); }
 .sg-add-btn { background:var(--gold); border:none; border-radius:8px; padding:6px 12px; font-size:14px; font-weight:700; color:var(--warm-dark); cursor:pointer; }
+.goal-card-ghost  { opacity:0.35; background:var(--linen) !important; border-style:dashed !important; }
+.goal-card-chosen { box-shadow:0 12px 36px var(--shadow-md) !important; transform:rotate(0.8deg); }
+.goal-card[data-goal-id] { cursor:grab; }
+.goal-card[data-goal-id]:active { cursor:grabbing; }
 
 /* Qa/Qb/Qc — kept for quarterly overview only */
 .q-prog-bar { height:4px; background:var(--blush); border-radius:4px; overflow:hidden; margin-bottom:4px; }
@@ -2502,6 +2506,7 @@ input[type=range] {
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#253820">
 <link rel="manifest" id="app-manifest" href="#">
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.3/Sortable.min.js"></script>
 </head>
 <body>
 <div class="layout">
@@ -5003,6 +5008,34 @@ function renderGoals(filter) {
     section(current,  'Current Goals',  '') +
     section(achieved, 'Achieved Goals', 'gold-hdr') +
     section(paused,   'Paused Goals',   'dim-hdr');
+
+  initGoalSortable();
+}
+
+function initGoalSortable() {
+  if (typeof Sortable === 'undefined') return;
+  document.querySelectorAll('.goals-grid-inner').forEach(grid => {
+    new Sortable(grid, {
+      animation: 180,
+      ghostClass: 'goal-card-ghost',
+      chosenClass: 'goal-card-chosen',
+      delay: 120,           // slight delay prevents accidental drags on mobile scroll
+      delayOnTouchOnly: true,
+      touchStartThreshold: 5,
+      onEnd() {
+        // Collect every goal ID across all sections in new DOM order
+        const allIds = [...document.querySelectorAll('.goals-grid-inner [data-goal-id]')]
+          .map(el => el.dataset.goalId);
+        // Re-sort the live GOALS array to match
+        GOALS.sort((a, b) => {
+          const ai = allIds.indexOf(String(a.id));
+          const bi = allIds.indexOf(String(b.id));
+          return (ai === -1 ? 9999 : ai) - (bi === -1 ? 9999 : bi);
+        });
+        saveState();
+      }
+    });
+  });
 }
 
 function goalCardHTML(g) {
@@ -5012,7 +5045,7 @@ function goalCardHTML(g) {
   const noSubs    = subs.length === 0;
   const note      = S.goalNotes[g.id] || g.note || '';
 
-  return `<div class="goal-card ${achieved ? 'achieved' : ''} ${g.status === 'paused' || g.status === 'dropped' ? 'paused' : ''}">
+  return `<div class="goal-card ${achieved ? 'achieved' : ''} ${g.status === 'paused' || g.status === 'dropped' ? 'paused' : ''}" data-goal-id="${g.id}">
     <div class="goal-card-header">
       ${catChipHTML(g.cat).replace('cat-chip','goal-card-cat cat-chip')}
       <div class="goal-card-actions">
