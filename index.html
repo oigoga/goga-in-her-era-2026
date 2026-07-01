@@ -4432,9 +4432,15 @@ function wpSaveTime(id, val) {
 function wpToggleComplete(id) {
   const task = (S.weeklyTasks || []).find(t => t.id === id);
   if (!task) return;
-  updateWeeklyTask(id, { completed: !task.completed });
+  const nowComplete = !task.completed;
+  updateWeeklyTask(id, { completed: nowComplete });
+  if ('serviceWorker' in navigator && S.notificationsEnabled) {
+    navigator.serviceWorker.ready.then(r =>
+      r.active?.postMessage({ type: 'TASK_UPDATE', taskId: id, completed: nowComplete })
+    );
+  }
   renderWeek(); renderHome();
-  if (!task.completed) toast('Done! Keep going 💪');
+  if (nowComplete) toast('Done! Keep going 💪');
 }
 
 function wpAssignDay(id, day) {
@@ -7105,22 +7111,40 @@ function scheduleNotificationsForToday() {
   if (!('serviceWorker' in navigator)) return;
   if (!window.Notification || Notification.permission !== 'granted') return;
   if (!S.notificationsEnabled) return;
+
   const now = getToday();
-  const todayDayName = WP_DAYS[now.getDay() === 0 ? 6 : now.getDay() - 1];
   const wkLabel = getCurrentWeekKey(now);
-  const tasks = getTasksForWeek(wkLabel).filter(t => t.assignedDay === todayDayName && !t.completed && t.proposedTime);
+  const todayDayName = WP_DAYS[now.getDay() === 0 ? 6 : now.getDay() - 1];
+  const todayIdx = WP_DAYS.indexOf(todayDayName);
+  const pastDays = WP_DAYS.slice(0, todayIdx);
+  const allWkTasks = getTasksForWeek(wkLabel);
+
+  const backlogTasks = allWkTasks.filter(t => pastDays.includes(t.assignedDay) && !t.completed);
+  const todayTasks   = allWkTasks.filter(t => t.assignedDay === todayDayName);
+  const allDayTasks  = [...backlogTasks, ...todayTasks];
+
+  // Per-task timed reminders (10 min before proposedTime)
+  const timedTasks = todayTasks
+    .filter(t => !t.completed && t.proposedTime)
+    .map(t => {
+      const p = parseProposedTime(t.proposedTime);
+      if (!p) return null;
+      const taskTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), p.h, p.min, 0, 0);
+      const delay = taskTime.getTime() - 10 * 60 * 1000 - now.getTime();
+      return delay > 0 ? { id: t.id, text: t.text, proposedTime: t.proposedTime, delay } : null;
+    }).filter(Boolean);
+
   navigator.serviceWorker.ready.then(reg => {
     if (!reg.active) return;
-    reg.active.postMessage({ type: 'CLEAR_NOTIFS' });
-    tasks.forEach(task => {
-      const t = parseProposedTime(task.proposedTime);
-      if (!t) return;
-      const taskTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), t.h, t.min, 0, 0);
-      const delay = taskTime.getTime() - 10 * 60 * 1000 - now.getTime();
-      if (delay > 0 && delay < 24 * 60 * 60 * 1000) {
-        reg.active.postMessage({ type: 'SCHEDULE_NOTIF', id: task.id, delay,
-          title: task.text, body: `Starting at ${task.proposedTime} · tap to open planner` });
-      }
+    reg.active.postMessage({
+      type: 'SCHEDULE_DAY',
+      date: now.toISOString().slice(0, 10),
+      isSunday: now.getDay() === 0,
+      backlogCount: backlogTasks.length,
+      newCount: todayTasks.length,
+      dayTasks:  allDayTasks.map(t => ({ id: t.id, completed: !!t.completed })),
+      weekTasks: allWkTasks.map(t => ({ id: t.id, completed: !!t.completed })),
+      timedTasks,
     });
   });
 }
