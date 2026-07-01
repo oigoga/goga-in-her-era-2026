@@ -2335,6 +2335,29 @@ input[type=range] {
 .fin-impulse-toggle.on .fin-impulse-dot { background:#e88080; border-color:#e88080; color:#fff; }
 .fin-impulse-label { font-size:12px; font-weight:600; color:var(--warm-mid); }
 
+/* ── Breakdown tab ── */
+.fin-bk-section { margin-bottom:28px; }
+.fin-bk-title { font-family:'Cormorant Garamond',serif; font-size:18px; font-weight:700; color:var(--warm-dark); margin-bottom:14px; }
+.fin-bk-bar-row { display:flex; align-items:center; gap:10px; margin-bottom:8px; }
+.fin-bk-bar-label { font-size:12px; font-weight:700; color:var(--warm-mid); min-width:110px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.fin-bk-bar-wrap { flex:1; height:8px; background:var(--blush); border-radius:6px; overflow:hidden; }
+.fin-bk-bar-fill { height:100%; border-radius:6px; background:linear-gradient(90deg,var(--gold),var(--accent-light)); transition:width 0.4s; }
+.fin-bk-bar-amt { font-size:12px; font-weight:700; color:var(--warm-dark); min-width:60px; text-align:right; }
+.fin-bk-bar-pct { font-size:10px; color:var(--warm-muted); min-width:34px; text-align:right; }
+.fin-bk-merchant-row { display:flex; align-items:center; justify-content:space-between; padding:8px 14px; background:var(--linen); border-radius:10px; margin-bottom:6px; }
+.fin-bk-merchant-name { font-size:13px; font-weight:600; color:var(--warm-dark); flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.fin-bk-merchant-amt { font-family:'Cormorant Garamond',serif; font-size:15px; font-weight:700; color:var(--rose-dark); }
+.fin-bk-merchant-ct { font-size:10px; color:var(--warm-muted); font-weight:600; margin-left:8px; white-space:nowrap; }
+.fin-bk-empty { text-align:center; padding:40px; color:var(--warm-muted); font-size:14px; }
+
+/* ── CSV import ── */
+.fin-csv-btn { background:var(--linen); border:1.5px dashed var(--blush-deep); border-radius:10px; padding:7px 14px; font-family:'Poppins',sans-serif; font-size:11px; font-weight:700; color:var(--warm-mid); cursor:pointer; transition:all 0.15s; }
+.fin-csv-btn:hover { background:var(--parchment); border-color:var(--rose); color:var(--warm-dark); }
+.csv-map-table { width:100%; border-collapse:collapse; margin:12px 0; font-size:12px; }
+.csv-map-table th { text-align:left; padding:6px 8px; background:var(--linen); color:var(--warm-muted); font-weight:700; text-transform:uppercase; letter-spacing:0.5px; font-size:10px; }
+.csv-map-table td { padding:6px 8px; border-bottom:1px solid var(--blush); color:var(--warm-dark); max-width:140px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.csv-preview-wrap { max-height:180px; overflow-y:auto; border:1px solid var(--blush); border-radius:10px; margin:12px 0; }
+
 /* ── Finance responsive — declared AFTER base finance CSS so cascade wins ── */
 @media (max-width: 768px) {
 
@@ -2788,18 +2811,23 @@ input[type=range] {
   <!-- Tab bar -->
   <div class="fin-tabs">
     <button class="fin-tab active" onclick="switchFinTab('transactions',this)">Transactions</button>
+    <button class="fin-tab" onclick="switchFinTab('breakdown',this)">Breakdown</button>
     <button class="fin-tab" onclick="switchFinTab('budget',this)">Budget</button>
     <button class="fin-tab" onclick="switchFinTab('goals',this)">Savings Goals</button>
-    <button class="fin-tab" onclick="switchFinTab('debts',this)">Debts</button>
+    <button class="fin-tab fin-debt-tab" onclick="switchFinTab('debts',this)">Debts</button>
     <button class="fin-tab" onclick="switchFinTab('settings',this)">Settings</button>
   </div>
 
   <!-- Tab panels -->
   <div id="fin-panel-transactions" class="fin-panel active"></div>
+  <div id="fin-panel-breakdown" class="fin-panel"></div>
   <div id="fin-panel-budget" class="fin-panel"></div>
   <div id="fin-panel-goals" class="fin-panel"></div>
   <div id="fin-panel-debts" class="fin-panel"></div>
   <div id="fin-panel-settings" class="fin-panel"></div>
+
+  <!-- Hidden file input for CSV import -->
+  <input type="file" id="fin-csv-input" accept=".csv,.txt" style="display:none" onchange="handleCSVFile(event)">
 </div>
 
 <!-- ══════ CALENDAR ══════ -->
@@ -6124,6 +6152,7 @@ if (!S.fin.displayCurrency) S.fin.displayCurrency = 'NGN';
 if (!S.fin.goals) S.fin.goals = [];
 if (!S.fin.customCategories) S.fin.customCategories = [];
 if (!S.fin.budgetTargets) S.fin.budgetTargets = {};
+if (S.fin.hideDebtTab === undefined) S.fin.hideDebtTab = false;
 
 let finViewMonth = new Date().getMonth();
 let finViewYear = new Date().getFullYear();
@@ -6134,10 +6163,34 @@ function switchFinTab(tab, el) {
   el.classList.add('active');
   document.getElementById('fin-panel-'+tab).classList.add('active');
   if (tab==='transactions') renderFinTransactions();
-  if (tab==='budget') renderFinBudget();
-  if (tab==='goals') renderFinGoals();
-  if (tab==='debts') renderFinDebts();
-  if (tab==='settings') renderFinSettings();
+  if (tab==='breakdown')    renderFinBreakdown();
+  if (tab==='budget')       renderFinBudget();
+  if (tab==='goals')        renderFinGoals();
+  if (tab==='debts')        renderFinDebts();
+  if (tab==='settings')     renderFinSettings();
+}
+
+function toggleDebtTab(el) {
+  el.classList.toggle('on');
+  const isOn = el.classList.contains('on');
+  el.querySelector('.fin-impulse-dot').textContent = isOn ? '✓' : '';
+  el.querySelector('.fin-impulse-label').textContent = isOn ? 'On' : 'Off';
+  S.fin.hideDebtTab = !isOn;
+  saveState();
+  applyDebtTabVisibility();
+}
+
+function applyDebtTabVisibility() {
+  const tabBtn = document.querySelector('.fin-debt-tab');
+  const panel  = document.getElementById('fin-panel-debts');
+  if (!tabBtn) return;
+  const hide = !!S.fin.hideDebtTab;
+  tabBtn.style.display = hide ? 'none' : '';
+  // If currently on debts tab and now hidden, switch to transactions
+  if (hide && panel && panel.classList.contains('active')) {
+    const txTab = document.querySelector('.fin-tab');
+    if (txTab) switchFinTab('transactions', txTab);
+  }
 }
 
 function fmtMoney(amount, currency) {
@@ -6166,6 +6219,7 @@ function getMonthTransactions(m, y) {
 }
 
 function renderFinance() {
+  applyDebtTabVisibility();
   renderFinDashboard();
   renderFinTransactions();
 }
@@ -6230,7 +6284,10 @@ function renderFinTransactions() {
         <div class="fin-month-label">${monthNames[finViewMonth]} ${finViewYear}</div>
         <button class="fin-month-btn" onclick="finNextMonth()">▸</button>
       </div>
-      <button class="fin-add-btn" onclick="openFinModal('add')">+ Add Transaction</button>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="fin-add-btn" onclick="openFinModal('add')">+ Add</button>
+        <button class="fin-csv-btn" onclick="document.getElementById('fin-csv-input').click()">⬆ Import CSV</button>
+      </div>
     </div>
     ${impulseCount > 0 ? `<div style="background:#fff5f5;border:1px solid #f0d0d0;border-radius:10px;padding:10px 16px;margin-bottom:14px;font-size:12px;font-weight:600;color:#c05050">
       ⚡ ${impulseCount} impulse purchase${impulseCount!==1?'s':''} this month · ${fmtMoney(impulseTotal)}
@@ -6851,6 +6908,17 @@ function renderFinSettings() {
   const customCats = S.fin.customCategories || [];
   panel.innerHTML = `
     <div class="fin-settings-group">
+      <div class="fin-settings-title">Tabs</div>
+      <div class="fin-setting-row">
+        <div class="fin-setting-label" style="flex:1">Show Debts tab</div>
+        <div class="fin-impulse-toggle ${S.fin.hideDebtTab ? '' : 'on'}" id="debt-tab-toggle" onclick="toggleDebtTab(this)" style="width:auto;padding:6px 14px">
+          <div class="fin-impulse-dot" style="margin-right:6px">${S.fin.hideDebtTab ? '' : '✓'}</div>
+          <div class="fin-impulse-label">${S.fin.hideDebtTab ? 'Off' : 'On'}</div>
+        </div>
+      </div>
+      <div style="font-size:11px;color:var(--warm-muted);margin-top:4px">Turn off if you have no debt to track.</div>
+    </div>
+    <div class="fin-settings-group">
       <div class="fin-settings-title">Display Currency</div>
       <div class="fin-setting-row">
         <div class="fin-setting-label">Show totals in</div>
@@ -6914,6 +6982,251 @@ function saveFinSettings() {
   saveState();
   renderFinDashboard();
   toast('Settings saved ✓');
+}
+
+// ── BREAKDOWN ──────────────────────────────────────────────────────────────
+function renderFinBreakdown() {
+  const m = finViewMonth, y = finViewYear;
+  const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const txs = getMonthTransactions(m, y);
+  const expenses = txs.filter(t => t.type === 'expense');
+  const incomes  = txs.filter(t => t.type === 'income');
+  const panel = document.getElementById('fin-panel-breakdown');
+
+  // Category totals
+  const catTotals = {};
+  expenses.forEach(t => {
+    const k = t.category || 'misc';
+    catTotals[k] = (catTotals[k] || 0) + convertToDisplay(t.amount, t.currency);
+  });
+  const totalSpent = Object.values(catTotals).reduce((s, v) => s + v, 0);
+  const catsSorted = Object.entries(catTotals).sort((a, b) => b[1] - a[1]);
+  const cats = getFinCategories();
+
+  // Merchant / description totals (top 10 by unique description)
+  const merchantTotals = {};
+  const merchantCounts = {};
+  expenses.forEach(t => {
+    const key = (t.description || (cats.find(c => c.id === t.category)?.name) || 'Unknown').trim();
+    merchantTotals[key] = (merchantTotals[key] || 0) + convertToDisplay(t.amount, t.currency);
+    merchantCounts[key] = (merchantCounts[key] || 0) + 1;
+  });
+  const topMerchants = Object.entries(merchantTotals).sort((a, b) => b[1] - a[1]).slice(0, 10);
+
+  // Income sources
+  const sourceTotals = {};
+  incomes.forEach(t => {
+    const key = (t.description || FIN_INCOME_SOURCES.find(s => s.id === t.source)?.name || 'Income').trim();
+    sourceTotals[key] = (sourceTotals[key] || 0) + convertToDisplay(t.amount, t.currency);
+  });
+  const topSources = Object.entries(sourceTotals).sort((a, b) => b[1] - a[1]);
+
+  panel.innerHTML = `
+    <div class="fin-controls">
+      <div class="fin-month-nav">
+        <button class="fin-month-btn" onclick="finViewMonth--;if(finViewMonth<0){finViewMonth=11;finViewYear--;}renderFinBreakdown()">◂</button>
+        <div class="fin-month-label">${monthNames[m]} ${y}</div>
+        <button class="fin-month-btn" onclick="finViewMonth++;if(finViewMonth>11){finViewMonth=0;finViewYear++;}renderFinBreakdown()">▸</button>
+      </div>
+    </div>
+
+    ${expenses.length === 0 ? '<div class="fin-bk-empty">No expenses logged for this month yet.</div>' : `
+
+    <div class="fin-bk-section">
+      <div class="fin-bk-title">Where your money went</div>
+      ${catsSorted.map(([catId, amt]) => {
+        const cat = cats.find(c => c.id === catId) || { icon: '📦', name: catId };
+        const pct = totalSpent > 0 ? (amt / totalSpent * 100) : 0;
+        return `<div class="fin-bk-bar-row">
+          <div class="fin-bk-bar-label">${cat.icon} ${cat.name}</div>
+          <div class="fin-bk-bar-wrap"><div class="fin-bk-bar-fill" style="width:${pct}%"></div></div>
+          <div class="fin-bk-bar-amt">${fmtMoney(amt)}</div>
+          <div class="fin-bk-bar-pct">${pct.toFixed(0)}%</div>
+        </div>`;
+      }).join('')}
+    </div>
+
+    ${topMerchants.length > 0 ? `
+    <div class="fin-bk-section">
+      <div class="fin-bk-title">Top merchants / descriptions</div>
+      ${topMerchants.map(([name, amt]) => `
+        <div class="fin-bk-merchant-row">
+          <div class="fin-bk-merchant-name">${name}</div>
+          <div style="display:flex;align-items:center;gap:4px">
+            <div class="fin-bk-merchant-amt">${fmtMoney(amt)}</div>
+            <div class="fin-bk-merchant-ct">${merchantCounts[name]}×</div>
+          </div>
+        </div>`).join('')}
+    </div>` : ''}
+
+    `}
+
+    ${topSources.length > 0 ? `
+    <div class="fin-bk-section">
+      <div class="fin-bk-title">Income sources</div>
+      ${topSources.map(([name, amt]) => `
+        <div class="fin-bk-merchant-row">
+          <div class="fin-bk-merchant-name">${name}</div>
+          <div class="fin-bk-merchant-amt" style="color:var(--sage-dark)">${fmtMoney(amt)}</div>
+        </div>`).join('')}
+    </div>` : ''}
+  `;
+}
+
+// ── CSV IMPORT ──────────────────────────────────────────────────────────────
+let _csvParsed = []; // holds parsed rows while user maps columns
+
+function parseCSVText(text) {
+  const lines = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n').filter(l => l.trim());
+  return lines.map(line => {
+    const cells = [];
+    let cur = '', inQ = false;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (ch === '"') { inQ = !inQ; }
+      else if (ch === ',' && !inQ) { cells.push(cur.trim()); cur = ''; }
+      else { cur += ch; }
+    }
+    cells.push(cur.trim());
+    return cells;
+  });
+}
+
+function handleCSVFile(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  event.target.value = ''; // reset so same file can be re-selected
+  const reader = new FileReader();
+  reader.onload = e => {
+    const rows = parseCSVText(e.target.result);
+    if (rows.length < 2) { toast('CSV appears empty or has only one row'); return; }
+    _csvParsed = rows;
+    showCSVMapper(rows);
+  };
+  reader.readAsText(file);
+}
+
+function showCSVMapper(rows) {
+  const headers = rows[0];
+  const preview = rows.slice(1, 6);
+  const overlay = document.getElementById('fin-modal-overlay');
+  const body = document.getElementById('fin-modal-body');
+
+  const colOpts = headers.map((h, i) => `<option value="${i}">${h || 'Column '+(i+1)}</option>`).join('');
+  const noneOpt = '<option value="-1">— none —</option>';
+
+  body.innerHTML = `
+    <button class="modal-close" onclick="document.getElementById('fin-modal-overlay').classList.remove('open')">×</button>
+    <div style="font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:700;color:var(--warm-dark);margin-bottom:4px;clear:both">Import from CSV</div>
+    <div style="font-size:12px;color:var(--warm-muted);margin-bottom:18px">${rows.length - 1} rows found · Map your columns below</div>
+
+    <div class="fin-form-inline">
+      <div class="fin-form-row">
+        <label>Date column</label>
+        <select id="csv-col-date">${colOpts}</select>
+      </div>
+      <div class="fin-form-row">
+        <label>Amount column</label>
+        <select id="csv-col-amount">${colOpts}</select>
+      </div>
+    </div>
+    <div class="fin-form-inline">
+      <div class="fin-form-row">
+        <label>Description column</label>
+        <select id="csv-col-desc">${noneOpt}${colOpts}</select>
+      </div>
+      <div class="fin-form-row">
+        <label>Type column (optional)</label>
+        <select id="csv-col-type">${noneOpt}${colOpts}</select>
+      </div>
+    </div>
+    <div class="fin-form-row">
+      <label>If no type column — treat amounts as:</label>
+      <select id="csv-sign-mode">
+        <option value="sign">Negative = expense, positive = income</option>
+        <option value="all-expense">All entries are expenses</option>
+        <option value="all-income">All entries are income</option>
+      </select>
+    </div>
+    <div class="fin-form-row">
+      <label>Currency</label>
+      <select id="csv-currency">
+        <option value="NGN">₦ Naira</option>
+        <option value="USD">$ USD</option>
+      </select>
+    </div>
+
+    <div style="font-size:12px;font-weight:700;color:var(--warm-muted);text-transform:uppercase;letter-spacing:0.5px;margin:14px 0 6px">Preview (first 5 rows)</div>
+    <div class="csv-preview-wrap">
+      <table class="csv-map-table">
+        <thead><tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr></thead>
+        <tbody>${preview.map(r => `<tr>${headers.map((_,i) => `<td>${r[i]||''}</td>`).join('')}</tr>`).join('')}</tbody>
+      </table>
+    </div>
+
+    <button class="modal-save-btn" style="width:100%;margin-top:8px" onclick="confirmCSVImport()">Import ${rows.length - 1} Transactions</button>
+  `;
+  overlay.classList.add('open');
+}
+
+function confirmCSVImport() {
+  const dateCol   = parseInt(document.getElementById('csv-col-date').value);
+  const amtCol    = parseInt(document.getElementById('csv-col-amount').value);
+  const descCol   = parseInt(document.getElementById('csv-col-desc').value);
+  const typeCol   = parseInt(document.getElementById('csv-col-type').value);
+  const signMode  = document.getElementById('csv-sign-mode').value;
+  const currency  = document.getElementById('csv-currency').value;
+
+  const rows = _csvParsed.slice(1); // skip header
+  let imported = 0, skipped = 0;
+
+  rows.forEach(row => {
+    const rawDate  = row[dateCol]?.trim();
+    const rawAmt   = row[amtCol]?.trim().replace(/[₦$,\s]/g, '');
+    const desc     = descCol >= 0 ? (row[descCol]?.trim() || '') : '';
+
+    if (!rawDate || !rawAmt) { skipped++; return; }
+
+    // Parse amount
+    const amt = Math.abs(parseFloat(rawAmt));
+    if (isNaN(amt) || amt === 0) { skipped++; return; }
+
+    // Parse date — try ISO, then DD/MM/YYYY, then MM/DD/YYYY
+    let parsedDate = rawDate;
+    if (/^\d{2}[\/\-]\d{2}[\/\-]\d{4}$/.test(rawDate)) {
+      const [d, m, y] = rawDate.split(/[\/\-]/);
+      parsedDate = `${y}-${m.padStart(2,'0')}-${d.padStart(2,'0')}`;
+    } else if (/^\d{1,2}[\/\-]\d{1,2}[\/\-]\d{4}$/.test(rawDate)) {
+      const parts = rawDate.split(/[\/\-]/);
+      parsedDate = `${parts[2]}-${parts[0].padStart(2,'0')}-${parts[1].padStart(2,'0')}`;
+    }
+    if (isNaN(new Date(parsedDate).getTime())) { skipped++; return; }
+
+    // Determine type
+    let type;
+    if (typeCol >= 0 && row[typeCol]) {
+      const tv = row[typeCol].trim().toLowerCase();
+      type = (tv.includes('cr') || tv.includes('income') || tv.includes('credit')) ? 'income' : 'expense';
+    } else if (signMode === 'sign') {
+      type = parseFloat(rawAmt) < 0 ? 'expense' : 'income';
+    } else {
+      type = signMode === 'all-income' ? 'income' : 'expense';
+    }
+
+    S.fin.transactions.push({
+      type, date: parsedDate, amount: amt, currency,
+      category: type === 'expense' ? 'misc' : null,
+      source: type === 'income' ? 'other' : null,
+      description: desc, note: '', impulse: false, id: Date.now() + imported
+    });
+    imported++;
+  });
+
+  saveState();
+  document.getElementById('fin-modal-overlay').classList.remove('open');
+  renderFinDashboard();
+  renderFinTransactions();
+  toast(`Imported ${imported} transactions${skipped > 0 ? ` (${skipped} skipped)` : ''} ✓`);
 }
 
 // ═══════════════════════════════════════════════════
