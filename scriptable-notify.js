@@ -26,7 +26,11 @@ async function fetchState() {
       'Authorization': `Bearer ${SUPABASE_KEY}`,
     };
     const rows = await req.loadJSON();
-    return rows?.[0]?.value ?? null;
+    const raw = rows?.[0]?.value;
+    if (!raw) return null;
+    // The app stores state as a JSON-encoded string in the `value` column —
+    // parse it back into an object, same as the app's own cloudGet() does.
+    return typeof raw === 'string' ? JSON.parse(raw) : raw;
   } catch (e) {
     return null;
   }
