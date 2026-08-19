@@ -1,14 +1,15 @@
 // Goga's Planner — Reminders
 // Paste into a new Scriptable script on your iPhone (e.g. name it "Goga Notify").
-// Triggered by iOS Shortcuts Personal Automations at fixed times — NOT run manually.
+// Triggered by an iOS Shortcuts Personal Automation (Time of Day) — NOT run manually.
 // Reliable because iOS wakes Shortcuts automations at their scheduled time even when
 // the app/browser is closed, unlike a web service worker's setTimeout.
 //
-// Setup (Shortcuts app → Automation tab → + → Create Personal Automation → Time of Day):
-//   7:00 AM, 12:00 PM, 8:20 PM, 10:00 PM, 2:00 PM  (daily, all five)
-//   Action: Scriptable → Run Script → this script
-//   Turn OFF "Ask Before Running" so it fires silently in the background.
-// (The 2:00 PM one only actually sends a notification on Sundays — safe to run daily.)
+// Set up as many Personal Automations at whatever times you want — the script reads
+// the clock itself and picks a sassy tone from the time of day, so there's no fixed
+// slot to match and no automation to update if your times move around.
+//   Shortcuts app → Automation tab → + → Create Personal Automation → Time of Day
+//   → Action: Scriptable → Run Script → this script
+//   → turn OFF "Ask Before Running" so it fires silently in the background.
 
 const SUPABASE_URL = 'https://pqzkebhrxkvswzgavmke.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_e8yxX4S_ojUnhwaWy8Q7AA_pFfWP1op';
@@ -94,86 +95,71 @@ function weekProgress(state, now) {
   return { done, total, pct };
 }
 
-// ── Notification content (mirrors sw.js fire7am/fire12pm/fire820pm/fire10pm/fireSunday2pm) ──
-function content7am(p) {
+// ── Notification content by time-of-day tone (mirrors sw.js's fire7am/fire12pm/
+// fire820pm/fire10pm sass, but by bucket instead of an exact clock match so it
+// still lands whatever time you set the automation for) ──
+function contentMorning(p) {
   const total = p.backlogCount + p.newCount;
+  if (total === 0) return { title: '🌅 Good morning, Goga!', body: "Nothing on the books yet today — add a task or enjoy the clean slate ✨" };
   const body = p.backlogCount > 0
     ? `${p.backlogCount} carried over + ${p.newCount} new tasks today (${total} total). Time to plan your day 📋`
     : `You have ${p.newCount} tasks today. Let's get it! 📋`;
   return { title: '🌅 Good morning, Goga!', body };
 }
 
-function content12pm(p) {
-  if (p.total === 0) return null;
+function contentMidday(p) {
+  if (p.total === 0) return { title: 'Quiet day so far 👀', body: 'No tasks on today\'s plate yet — go add one or just breathe.' };
   if (p.pct === 0) return { title: 'Olodo uprising detected 😭', body: `You still haven't ticked anything off your list! ${p.total} tasks to go, sis.` };
   if (p.pct < 30)  return { title: "Someone's slacking... 👀", body: `You've done ${p.done}/${p.total} tasks. You still have ${p.remaining} to go!` };
   if (p.pct < 50)  return { title: "Girl damn!! Let's get this 🔥", body: `${p.done}/${p.total} done — ${p.remaining} to go. You've got this!` };
-  return { title: 'FIRE FIRE FIRE 🔥🔥🔥', body: `${p.done}/${p.total} tasks down! ${p.remaining} to go — you're ON ONE!` };
+  if (p.pct < 100) return { title: 'FIRE FIRE FIRE 🔥🔥🔥', body: `${p.done}/${p.total} tasks down! ${p.remaining} to go — you're ON ONE!` };
+  return { title: '⭐ Already done?!', body: `${p.done}/${p.total} tasks done and it's not even evening. Show off 👑` };
 }
 
-function content820pm(p) {
-  if (p.total === 0) return null;
+function contentEvening(p) {
+  if (p.total === 0) return { title: 'Free evening 🌙', body: 'Nothing was on the plate today — rest up or get ahead for tomorrow.' };
   if (p.pct >= 100) return { title: '⭐⭐⭐⭐⭐ Everything is done!!', body: 'You absolutely ate today. Not even a crumb left. 👑' };
   if (p.pct >= 80)  return { title: 'You outdid yourself boo!! ✨', body: `${p.done}/${p.total} tasks done. What an incredible day!` };
-  return { title: 'The day is ending... ⏰', body: `You have ${p.remaining}/${p.total} tasks still to go — can you knock them out?` };
+  return { title: 'The day is winding down... ⏰', body: `You have ${p.remaining}/${p.total} tasks still to go — can you knock them out?` };
 }
 
-function content10pm(p) {
-  if (p.pct >= 100 || p.remaining === 0) return null;
-  return { title: '⏰ 2 more hours, Goga!', body: `${p.remaining} tasks left — can you close out strong tonight?` };
+function contentNight(p) {
+  if (p.total === 0) return { title: '🌙 Quiet one tonight', body: 'Nothing was scheduled today — sleep well, Goga.' };
+  if (p.pct >= 100 || p.remaining === 0) return { title: '👑 Closed it out!', body: `${p.done}/${p.total} done today. Go rest, you earned it.` };
+  return { title: '⏰ Day\'s almost over, Goga!', body: `${p.remaining} tasks left — can you close out strong tonight?` };
 }
 
-function contentSun2pm(w) {
-  if (w.total === 0) return null;
+function contentWeekly(w) {
+  if (w.total === 0) return { title: '🌿 Slow week', body: 'No tasks logged for the week yet — plan on ahead when you\'re ready.' };
   if (w.pct < 40) return { title: 'Girl you slacking or something?? 😭', body: `${w.done}/${w.total} tasks done this week... we need to talk.` };
   if (w.pct < 85) return { title: "Girl you're on to something 👀", body: `${w.done}/${w.total} weekly tasks done — weldone! Go harder this week! 💪` };
   return { title: 'THE WOMAN OF YOUR DREAMS 👑', body: `${w.done}/${w.total} tasks done this week. The IT girl? You are HER!!! 🔥` };
 }
 
-// ── Pick the closest scheduled slot to right now (tolerate a few minutes of drift) ──
-function closestSlot(now) {
-  const mins = now.getHours() * 60 + now.getMinutes();
-  const slots = [
-    { name: '7am',   mins: 7 * 60 },
-    { name: '12pm',  mins: 12 * 60 },
-    { name: '820pm', mins: 20 * 60 + 20 },
-    { name: '10pm',  mins: 22 * 60 },
-  ];
-  if (now.getDay() === 0) slots.push({ name: 'sun2pm', mins: 14 * 60 });
-
-  let best = null, bestDiff = Infinity;
-  for (const s of slots) {
-    const diff = Math.abs(mins - s.mins);
-    if (diff < bestDiff) { bestDiff = diff; best = s; }
-  }
-  return bestDiff <= 20 ? best.name : null; // >20min off any slot = don't fire (e.g. manual test run)
-}
-
 // ── Run ───────────────────────────────────────────────────────────────────────
+// No fixed slots to match — read whatever time it actually is and pick the tone
+// that fits, so any automation time (or a time you change later) still works.
 const now = new Date();
-const slot = closestSlot(now);
-if (!slot) {
-  Script.complete();
-} else {
-  const state = await fetchState();
-  if (state) {
-    const dp = dayProgress(state, now);
-    const wp = weekProgress(state, now);
-    const msg =
-      slot === '7am'   ? content7am(dp) :
-      slot === '12pm'  ? content12pm(dp) :
-      slot === '820pm' ? content820pm(dp) :
-      slot === '10pm'  ? content10pm(dp) :
-      slot === 'sun2pm'? contentSun2pm(wp) : null;
+const hour = now.getHours();
+const isSundayAfternoon = now.getDay() === 0 && hour >= 12;
 
-    if (msg) {
-      const n = new Notification();
-      n.title = msg.title;
-      n.body = msg.body;
-      n.sound = 'default';
-      n.openURL = APP_URL;
-      await n.schedule();
-    }
-  }
-  Script.complete();
+const state = await fetchState();
+if (state) {
+  const msg = isSundayAfternoon
+    ? contentWeekly(weekProgress(state, now))
+    : (() => {
+        const dp = dayProgress(state, now);
+        if (hour < 11) return contentMorning(dp);
+        if (hour < 17) return contentMidday(dp);
+        if (hour < 21) return contentEvening(dp);
+        return contentNight(dp);
+      })();
+
+  const n = new Notification();
+  n.title = msg.title;
+  n.body = msg.body;
+  n.sound = 'default';
+  n.openURL = APP_URL;
+  await n.schedule();
 }
+Script.complete();
