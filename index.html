@@ -707,6 +707,12 @@ body {
   border: 1px solid var(--accent); border-radius: 10px;
   padding: 2px 6px; text-transform: uppercase; flex-shrink: 0;
 }
+.size-badge {
+  font-size: 9px; font-weight: 800; letter-spacing: 0.4px;
+  background: var(--surface-2, #f5f0eb); color: var(--warm-muted);
+  border: 1px solid var(--parchment); border-radius: 10px;
+  padding: 2px 6px; flex-shrink: 0;
+}
 .wp-promote-btn {
   font-size: 9px; font-weight: 700;
   border: 1px solid var(--sage); border-radius: 6px;
@@ -3129,6 +3135,16 @@ const CAT_COLORS_DEFAULT = {
 
 const TIME_BLOCKS = ['🌅 Morning', '🔥 Deep Work', '🌤 Afternoon', '🌙 Evening'];
 
+// Task size tiers — buckets tasks by how long they take, so a 2-minute
+// tick isn't weighted the same as a 45-minute block. Drives the Google
+// Calendar event length and the home-screen grouping.
+const TASK_SIZES = [
+  { id:'quick', label:'Quick Ticks', icon:'⚡', min:1,  max:5,    calMins:5  },
+  { id:'focus', label:'Focus Tasks', icon:'🎯', min:5,  max:30,   calMins:20 },
+  { id:'big',   label:'Big Rocks',   icon:'🪨', min:30, max:null, calMins:60 },
+];
+function taskSizeInfo(id) { return TASK_SIZES.find(s => s.id === id) || null; }
+
 const DEFAULT_FREQ_HABITS_DEF = [
   { id:'freq-gym',      name:'Gym',       icon:'🏋️', freq:3 },
   { id:'freq-upskill',  name:'Upskilling (90m blocks)', icon:'📚', freq:2 },
@@ -3625,6 +3641,7 @@ function addWeeklyTask(task) {
     id:           generateId(),
     text:         task.text          || '',
     category:     task.category      || null,
+    size:         task.size          || null,
     goalId:       task.goalId        || null,
     monthKey,
     weekKey,
@@ -3851,6 +3868,21 @@ function updateMobileNav(id) {
 // ═══════════════════════════════════════════════════
 // HOME
 // ═══════════════════════════════════════════════════
+// Bucket tasks by their size tier (Quick Ticks / Focus Tasks / Big Rocks),
+// dropping empty buckets. Unsized tasks land in a trailing catch-all group.
+function groupTasksBySize(tasks) {
+  const groups = TASK_SIZES.map(sz => ({ sizeInfo: sz, tasks: tasks.filter(t => t.size === sz.id) }));
+  const unsized = tasks.filter(t => !taskSizeInfo(t.size));
+  if (unsized.length) groups.push({ sizeInfo: null, tasks: unsized });
+  return groups.filter(g => g.tasks.length);
+}
+
+function sizeGroupHeaderHTML(sizeInfo, tasks) {
+  const label = sizeInfo ? `${sizeInfo.icon} ${sizeInfo.label}` : '📦 Unsized';
+  const doneCount = tasks.filter(t => t.completed).length;
+  return `<div style="font-size:9px;font-weight:700;letter-spacing:0.6px;color:var(--warm-muted);opacity:0.75;margin:10px 0 4px;padding-left:2px">${label} · ${doneCount}/${tasks.length}</div>`;
+}
+
 function renderHome() {
   const now = getToday();
   const h = now.getHours();
@@ -3972,6 +4004,7 @@ function renderHome() {
     const cat  = t.category || 'DEFAULT';
     const col  = CAT_COLORS[cat] || CAT_COLORS.DEFAULT;
     const goal = t.goalId ? GOALS.find(g => String(g.id) === String(t.goalId)) : null;
+    const sz   = taskSizeInfo(t.size);
     const subs = t.subtasks || [];
     const subsDone = subs.filter(s => s.done).length;
     const subsPct  = subs.length ? Math.round(subsDone / subs.length * 100) : 0;
@@ -3989,6 +4022,7 @@ function renderHome() {
           <div class="task-item-text${t.completed ? ' completed' : ''}">${t.text}</div>
           ${goal ? `<div class="task-item-meta">🎯 ${goal.name}</div>` : ''}
         </div>
+        ${sz ? `<span class="size-badge" style="flex-shrink:0" title="${sz.min}-${sz.max||'∞'} min">${sz.icon}</span>` : ''}
         ${isBacklog ? '<span class="backlog-badge" style="flex-shrink:0">Backlog</span>' : ''}
       </div>
       ${subs.length ? `<div class="wp-card-subprog" style="margin:0;border-radius:0"><div class="wp-card-subprog-fill" id="h-wp-spfill-${t.id}" style="width:${subsPct}%"></div></div>` : ''}
@@ -4006,23 +4040,31 @@ function renderHome() {
 
   if (homeBL.length > 0) {
     plateHTML += `<div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:1.2px;color:#c05050;margin-bottom:6px">
-      🔴 Backlog · ${homeBL.length} incomplete from earlier this week</div>
-    ${homeBL.map(t => homeTodayTaskHTML(t, true)).join('')}
-    <div style="height:1px;background:var(--parchment);margin:10px 0"></div>`;
+      🔴 Backlog · ${homeBL.length} incomplete from earlier this week</div>`;
+    plateHTML += groupTasksBySize(homeBL).map(g =>
+      sizeGroupHeaderHTML(g.sizeInfo, g.tasks) + g.tasks.map(t => homeTodayTaskHTML(t, true)).join('')
+    ).join('');
+    plateHTML += `<div style="height:1px;background:var(--parchment);margin:10px 0"></div>`;
   }
 
   if (homeTodayTasks.length > 0) {
     plateHTML += `<div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:1.2px;color:var(--warm-muted);margin-bottom:6px">
-      📋 ${todayDayName2} · ${homeTodayTasks.filter(t=>t.completed).length}/${homeTodayTasks.length} done</div>
-    ${homeTodayTasks.map(t => homeTodayTaskHTML(t, false)).join('')}`;
+      📋 ${todayDayName2} · ${homeTodayTasks.filter(t=>t.completed).length}/${homeTodayTasks.length} done</div>`;
+    plateHTML += groupTasksBySize(homeTodayTasks).map(g =>
+      sizeGroupHeaderHTML(g.sizeInfo, g.tasks) + g.tasks.map(t => homeTodayTaskHTML(t, false)).join('')
+    ).join('');
   } else if (homeBL.length === 0) {
     plateHTML += `<div style="text-align:center;padding:20px 0;font-size:12px;color:var(--warm-muted);font-style:italic">
       No tasks assigned to today yet</div>`;
   }
 
+  const homeSizeOptions = TASK_SIZES.map(s => `<option value="${s.id}">${s.icon} ${s.label}</option>`).join('');
   plateHTML += `<div class="home-today-add">
     <input class="home-today-input" id="home-today-input" placeholder="Quick task for today…"
       onkeydown="if(event.key==='Enter')homeAddTodayTask()">
+    <select class="wp-add-select" id="home-today-size-select" style="flex-shrink:0">
+      <option value="">Size</option>${homeSizeOptions}
+    </select>
     <button class="home-today-add-btn" onclick="homeAddTodayTask()">+ Add</button>
   </div>`;
 
@@ -4062,13 +4104,15 @@ function homeTodayToggle(id) {
 
 function homeAddTodayTask() {
   const inp = document.getElementById('home-today-input');
+  const sizeSel = document.getElementById('home-today-size-select');
   const text = inp ? inp.value.trim() : '';
   if (!text) { if (inp) inp.focus(); return; }
   const now2 = getToday();
   const todayDay = WP_DAYS[now2.getDay() === 0 ? 6 : now2.getDay() - 1];
   const wkLabel  = getCurrentWeekKey(now2);
-  addWeeklyTask({ text, weekKey: wkLabel, assignedDay: todayDay });
+  addWeeklyTask({ text, weekKey: wkLabel, assignedDay: todayDay, size: sizeSel ? sizeSel.value || null : null });
   inp.value = '';
+  if (sizeSel) sizeSel.value = '';
   renderHome();
   const weekView = document.getElementById('view-week');
   if (weekView && weekView.classList.contains('active')) renderWeek();
@@ -4164,6 +4208,8 @@ function renderWeek() {
   const goalOptions = GOALS
     .filter(g => g.status !== 'paused')
     .map(g => `<option value="${g.id}">G${GOALS.indexOf(g)+1}: ${g.name.slice(0,28)}</option>`).join('');
+  const sizeOptions = TASK_SIZES
+    .map(s => `<option value="${s.id}">${s.icon} ${s.label}</option>`).join('');
 
   // Day columns HTML
   const dayColsHTML = WP_DAYS.map(day => {
@@ -4237,6 +4283,9 @@ function renderWeek() {
       </select>
       <select class="wp-add-select" id="wp-goal-select">
         <option value="">Link goal</option>${goalOptions}
+      </select>
+      <select class="wp-add-select" id="wp-size-select">
+        <option value="">Size</option>${sizeOptions}
       </select>
       <button class="wp-add-btn" onclick="wpAddTask()">+ Add</button>
     </div>
@@ -4338,6 +4387,7 @@ function wpCardHTML(task, inColumn) {
       <div class="pool-card-bottom">
         ${task.isBacklog ? '<span class="backlog-badge">Backlog</span>' : ''}
         ${!task.weekKey ? '<span class="month-plan-badge">Month plan</span>' : ''}
+        ${(() => { const sz = taskSizeInfo(task.size); return sz ? `<span class="size-badge" title="${sz.min}-${sz.max||'∞'} min">${sz.icon} ${sz.label}</span>` : ''; })()}
         ${!task.weekKey
           ? `<button class="wp-promote-btn" onclick="event.stopPropagation();wpPromoteToWeek('${task.id}')" title="Add to this week">→ This week</button>`
           : `<input class="pool-card-time" type="text" placeholder="+ time"
@@ -4539,6 +4589,7 @@ function wpAddTask() {
   const inp     = document.getElementById('wp-task-input');
   const catSel  = document.getElementById('wp-cat-select');
   const goalSel = document.getElementById('wp-goal-select');
+  const sizeSel = document.getElementById('wp-size-select');
   const text = inp ? inp.value.trim() : '';
   if (!text) { if (inp) inp.focus(); return; }
   const wkLabel = getCurrentWeekKey(getToday());
@@ -4546,13 +4597,14 @@ function wpAddTask() {
     text,
     category:     catSel.value  || null,
     goalId:       goalSel.value || null,
+    size:         sizeSel.value || null,
     weekKey:      wkLabel,
     assignedDay:  null,
     proposedTime: null,
     completed:    false,
     isBacklog:    false,
   });
-  inp.value = ''; catSel.value = ''; goalSel.value = '';
+  inp.value = ''; catSel.value = ''; goalSel.value = ''; sizeSel.value = '';
   renderWeek(); renderHome();
   toast('Task added ✓');
 }
@@ -7380,8 +7432,9 @@ function gcalAddUrl(task) {
   }
   const start = new Date(eventDate);
   start.setHours(startH, startM, 0, 0);
-  const end = new Date(start);
-  end.setHours(startH + 1, startM, 0, 0);
+  const sizeInfo = taskSizeInfo(task.size);
+  const durationMins = sizeInfo ? sizeInfo.calMins : 60;
+  const end = new Date(start.getTime() + durationMins * 60000);
   const pad = n => String(n).padStart(2, '0');
   const fmt = d => `${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}T${pad(d.getHours())}${pad(d.getMinutes())}00`;
   const goal = task.goalId ? GOALS.find(g => String(g.id) === String(task.goalId)) : null;
